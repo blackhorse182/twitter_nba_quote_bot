@@ -1,6 +1,7 @@
 const { TwitterApi } = require('twitter-api-v2');
 const schedule = require('node-schedule');
 const axios = require('axios');
+const cheerio = require('cheerio');
 const express = require('express');
 require('dotenv').config();
 
@@ -8,45 +9,57 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const client = new TwitterApi({
-    appKey: 'MQnQJz6JfQ6FdbhGjmsgtN5aE', // Remplace par ta vraie API Key
-    appSecret: 'MO4J0paVS0kvmPvSh715OjDU5R8cjJuWlOPN6Zz5JDPZqgmb5G',         // Remplace par ton vrai API Secret
-    accessToken: '1509015998317404161-0PtKc05VWPikCLXyKtXvIIo5IQ8GUF',    // Ton Access Token
-    accessSecret: 'ejdT2uFYLQXFvHM1rkoJXe6U2FX0PHTqWjgqVQhm3EmoL',  // Ton Access Secret
-  });
+    appKey: process.env.TWITTER_APP_KEY,
+    appSecret: process.env.TWITTER_APP_SECRET,
+    accessToken: process.env.TWITTER_ACCESS_TOKEN,
+    accessSecret: process.env.TWITTER_ACCESS_SECRET,
+});
 
 const hashtags = "#NBA #Basketball #Stats";
-const SPORTS_DATA_API_KEY = process.env.SPORTS_DATA_API_KEY;
 
-// Fetch a random recent game result
+// Fetch recent game results from ESPN
 async function getRecentGameResult() {
     try {
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const response = await axios.get(
-            `https://api.sportsdata.io/v3/nba/scores/json/GamesByDate/${today}?key=${SPORTS_DATA_API_KEY}`
-        );
-        const games = response.data.filter(game => game.Status === "Final"); // Only completed games
-        if (games.length === 0) return "No completed NBA games found for today.";
+        const response = await axios.get('https://www.espn.com/nba/scoreboard');
+        const $ = cheerio.load(response.data);
+        const games = [];
 
-        const randomGame = games[Math.floor(Math.random() * games.length)];
-        return `${randomGame.AwayTeam} ${randomGame.AwayTeamScore} - ${randomGame.HomeTeam} ${randomGame.HomeTeamScore} (Final)`;
+        // Scrape game data from the scoreboard
+        $('.ScoreboardScoreCell').each((i, element) => {
+            const teams = $(element).find('.ScoreCell_Score--scoreboard').text().split(' ');
+            const scores = $(element).find('.ScoreCell_Score').map((j, el) => $(el).text()).get();
+            if (scores.length === 2) {
+                games.push(`${teams[0]} ${scores[0]} - ${teams[1]} ${scores[1]} (Final)`);
+            }
+        });
+
+        if (games.length === 0) return "No recent NBA game results found.";
+        return games[Math.floor(Math.random() * games.length)];
     } catch (error) {
         console.error("Error fetching game result:", error.message);
         return "Unable to fetch latest game result.";
     }
 }
 
-// Fetch a random stat from a recent game
+// Fetch a random stat (simplified, from game leaders on ESPN)
 async function getRandomStat() {
     try {
-        const today = new Date().toISOString().split('T')[0];
-        const response = await axios.get(
-            `https://api.sportsdata.io/v3/nba/stats/json/PlayerGameStatsByDate/${today}?key=${SPORTS_DATA_API_KEY}`
-        );
-        const stats = response.data.filter(stat => stat.Minutes > 0); // Players who played
-        if (stats.length === 0) return "No player stats available for today.";
+        const response = await axios.get('https://www.espn.com/nba/scoreboard');
+        const $ = cheerio.load(response.data);
+        const stats = [];
 
-        const topScorer = stats.reduce((prev, curr) => (curr.Points > prev.Points ? curr : prev), stats[0]);
-        return `${topScorer.Name} scored ${topScorer.Points} points for ${topScorer.Team}.`;
+        // Scrape leading scorers from game summaries
+        $('.ScoreboardScoreCell__Leaders').each((i, element) => {
+            const player = $(element).find('.Athlete__PlayerName').text();
+            const points = $(element).find('.Stat__Value').text();
+            const team = $(element).closest('.ScoreboardScoreCell').find('.ScoreCell_Score--scoreboard').text().split(' ')[0];
+            if (player && points) {
+                stats.push(`${player} scored ${points} points for ${team}.`);
+            }
+        });
+
+        if (stats.length === 0) return "No player stats available.";
+        return stats[Math.floor(Math.random() * stats.length)];
     } catch (error) {
         console.error("Error fetching stat:", error.message);
         return "Unable to fetch latest stat.";
@@ -55,7 +68,7 @@ async function getRandomStat() {
 
 // Randomly select content type
 async function getRandomNBAPost() {
-    const isGameResult = Math.random() < 0.5; // 50% chance for game or stat
+    const isGameResult = Math.random() < 0.5;
     return isGameResult ? await getRecentGameResult() : await getRandomStat();
 }
 
@@ -87,7 +100,7 @@ schedule.scheduleJob('0 */6 * * *', () => {
 // Initial post on startup
 postNBATweet();
 
-// Start Express server for deployment
+// Start Express server
 app.get('/', (req, res) => {
     res.send('NBA Twitter Bot is running!');
 });
