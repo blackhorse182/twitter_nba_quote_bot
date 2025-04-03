@@ -209,7 +209,7 @@ async function postNBATweet() {
 }
 
 // Schedule posts every 6 hours
-schedule.scheduleJob('0 */6 * * *', () => {
+schedule.scheduleJob('0 */12 * * *', () => {
     postNBATweet();
 });
 
