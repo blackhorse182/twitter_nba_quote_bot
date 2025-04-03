@@ -19,20 +19,51 @@ const client = new TwitterApi({
 
 // Static fallback data
 const staticFallbackGames = [
-    "Bulls 87 - Jazz 86 (Final, 1998 Finals) - Jordan's 'Last Shot'",
-    "Cavs 93 - Warriors 89 (Final, 2016 Finals) - LeBron's Block & Kyrie's 3",
-    "Lakers 100 - Celtics 96 (Final, 2010 Finals) - Kobe's 5th ring",
-    "Spurs 81 - Pistons 74 (Final, 2005 Finals) - Duncan's dominance",
-    "Heat 103 - Spurs 100 (OT, 2013 Finals) - Ray Allen's clutch 3",
+    {
+        game: "Bulls 87 - Jazz 86 (Final, 1998 Finals) - Jordan's 'Last Shot'",
+        video: "https://www.youtube.com/watch?v=vdPQ3QxDZ1s"
+    },
+    {
+        game: "Cavs 93 - Warriors 89 (Final, 2016 Finals) - LeBron's Block & Kyrie's 3",
+        video: "https://www.youtube.com/watch?v=jL4pXNfN_LI"
+    },
+    {
+        game: "Lakers 100 - Celtics 96 (Final, 2010 Finals) - Kobe's 5th ring",
+        video: "https://www.youtube.com/watch?v=ZI1Fh6fzO3o"
+    },
+    {
+        game: "Spurs 81 - Pistons 74 (Final, 2005 Finals) - Duncan's dominance",
+        video: "https://www.youtube.com/watch?v=FGZJFH0V3h8"
+    },
+    {
+        game: "Heat 103 - Spurs 100 (OT, 2013 Finals) - Ray Allen's clutch 3",
+        video: "https://www.youtube.com/watch?v=YDiXQ7ST7XU"
+    }
 ];
 
 const staticFallbackStats = [
-    "Michael Jordan scored 45 points for Bulls (1998 Finals - 'Last Shot').",
-    "LeBron James recorded a triple-double (27-11-11) for Cavs (2016 Finals).",
-    "Kobe Bryant scored 23 points and grabbed 15 rebounds for Lakers (2010 Finals).",
-    "Tim Duncan scored 25 points and 11 rebounds for Spurs (2005 Finals).",
-    "Ray Allen hit a game-tying 3-pointer with 5.2 seconds left for Heat (2013 Finals).",
+    {
+        stat: "Michael Jordan scored 45 points for Bulls (1998 Finals - 'Last Shot').",
+        video: "https://www.youtube.com/watch?v=vdPQ3QxDZ1s"
+    },
+    {
+        stat: "LeBron James recorded a triple-double (27-11-11) for Cavs (2016 Finals).",
+        video: "https://www.youtube.com/watch?v=jL4pXNfN_LI"
+    },
+    {
+        stat: "Kobe Bryant scored 23 points and grabbed 15 rebounds for Lakers (2010 Finals).",
+        video: "https://www.youtube.com/watch?v=ZI1Fh6fzO3o"
+    },
+    {
+        stat: "Tim Duncan scored 25 points and 11 rebounds for Spurs (2005 Finals).",
+        video: "https://www.youtube.com/watch?v=FGZJFH0V3h8"
+    },
+    {
+        stat: "Ray Allen hit a game-tying 3-pointer with 5.2 seconds left for Heat (2013 Finals).",
+        video: "https://www.youtube.com/watch?v=YDiXQ7ST7XU"
+    }
 ];
+
 
 
 // Get today and yesterday's dates
