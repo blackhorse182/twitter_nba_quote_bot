@@ -19,20 +19,21 @@ const client = new TwitterApi({
 
 // Static fallback data
 const staticFallbackGames = [
-    "Lakers 110 - Warriors 105 (Final, 2023 Playoffs)",
-    "Celtics 120 - Heat 116 (Final, 2023 ECF)",
-    "Nuggets 113 - Lakers 111 (Final, 2023 WCF)",
-    "Bucks 128 - Suns 99 (Final, 2021 Finals)",
-    "Raptors 114 - Warriors 110 (Final, 2019 Finals)",
+    "Bulls 87 - Jazz 86 (Final, 1998 Finals) - Jordan's 'Last Shot'",
+    "Cavs 93 - Warriors 89 (Final, 2016 Finals) - LeBron's Block & Kyrie's 3",
+    "Lakers 100 - Celtics 96 (Final, 2010 Finals) - Kobe's 5th ring",
+    "Spurs 81 - Pistons 74 (Final, 2005 Finals) - Duncan's dominance",
+    "Heat 103 - Spurs 100 (OT, 2013 Finals) - Ray Allen's clutch 3",
 ];
 
 const staticFallbackStats = [
-    "LeBron James scored 38 points for Lakers (2023 Playoffs).",
-    "Jayson Tatum scored 40 points for Celtics (2023 ECF).",
-    "Nikola Jokic scored 32 points for Nuggets (2023 WCF).",
-    "Giannis Antetokounmpo scored 50 points for Bucks (2021 Finals).",
-    "Kawhi Leonard scored 36 points for Raptors (2019 Finals).",
+    "Michael Jordan scored 45 points for Bulls (1998 Finals - 'Last Shot').",
+    "LeBron James recorded a triple-double (27-11-11) for Cavs (2016 Finals).",
+    "Kobe Bryant scored 23 points and grabbed 15 rebounds for Lakers (2010 Finals).",
+    "Tim Duncan scored 25 points and 11 rebounds for Spurs (2005 Finals).",
+    "Ray Allen hit a game-tying 3-pointer with 5.2 seconds left for Heat (2013 Finals).",
 ];
+
 
 // Get today and yesterday's dates
 const getDateStrings = () => {
