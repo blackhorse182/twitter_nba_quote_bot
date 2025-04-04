@@ -1,7 +1,7 @@
 const { TwitterApi } = require('twitter-api-v2');
 const schedule = require('node-schedule');
 const express = require('express');
-const puppeteer = require('puppeteer');
+const axios = require('axios');
 require('dotenv').config({ path: './keys.env' });
 
 const app = express();
@@ -17,73 +17,37 @@ const client = new TwitterApi({
 const hashtags = "#NBA #Basketball #Stats";
 
 async function getNBAResults() {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-});
-  const page = await browser.newPage();
   try {
     const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const year = today.getFullYear();
-    let url = `https://www.basketball-reference.com/boxscores/?month=${month}&day=${day}&year=${year}`;
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1); // Check yesterday’s games by default
+    const dateStr = yesterday.toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    let results = await page.evaluate(() => {
-      const games = Array.from(document.querySelectorAll('div.game_summary'));
-      return games.map(game => {
-        const date = document.querySelector('h1')?.textContent.trim() || 'N/A';
-        const teams = Array.from(game.querySelectorAll('table.teams tbody tr'));
-        const awayTeam = teams[0]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
-        const awayScore = teams[0]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
-        const homeTeam = teams[1]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
-        const homeScore = teams[1]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
-        const score = (homeScore !== 'N/A' && awayScore !== 'N/A') ? `${homeScore}-${awayScore}` : 'Final';
-        return { date, homeTeam, awayTeam, score };
-      }).filter(item => item.homeTeam !== 'N/A');
+    const response = await axios.get('https://www.balldontlie.io/api/v1/games', {
+      params: {
+        dates: [dateStr], // Fetch games for yesterday
+        per_page: 100,    // Ensure we get all games in one request
+      },
     });
 
-    if (results.length === 0) {
-      console.log('No games today, trying yesterday...');
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const yMonth = String(yesterday.getMonth() + 1).padStart(2, '0');
-      const yDay = String(yesterday.getDate()).padStart(2, '0');
-      const yYear = yesterday.getFullYear();
-      url = `https://www.basketball-reference.com/boxscores/?month=${yMonth}&day=${yDay}&year=${yYear}`;
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-      await new Promise(resolve => setTimeout(resolve, 5000));
-
-      results = await page.evaluate(() => {
-        const games = Array.from(document.querySelectorAll('div.game_summary'));
-        return games.map(game => {
-          const date = document.querySelector('h1')?.textContent.trim() || 'N/A';
-          const teams = Array.from(game.querySelectorAll('table.teams tbody tr'));
-          const awayTeam = teams[0]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
-          const awayScore = teams[0]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
-          const homeTeam = teams[1]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
-          const homeScore = teams[1]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
-          const score = (homeScore !== 'N/A' && awayScore !== 'N/A') ? `${homeScore}-${awayScore}` : 'Final';
-          return { date, homeTeam, awayTeam, score };
-        }).filter(item => item.homeTeam !== 'N/A');
-      });
+    const games = response.data.data;
+    if (games.length === 0) {
+      console.log('No games found for', dateStr);
+      return [];
     }
 
-    if (results.length === 0) {
-      console.error('Aucun résultat trouvé');
-    } else {
-      console.log('Résultats récupérés:', results);
-    }
+    const results = games.map(game => ({
+      date: new Date(game.date).toDateString(), // e.g., "Thu Apr 03 2025"
+      homeTeam: game.home_team.full_name,
+      awayTeam: game.visitor_team.full_name,
+      score: `${game.home_team_score}-${game.visitor_team_score}`,
+    }));
 
+    console.log('Résultats récupérés:', results);
     return results;
   } catch (error) {
-    console.error('Scraping Error:', error.message);
+    console.error('API Error:', error.message);
     return [];
-  } finally {
-    await browser.close();
   }
 }
 
