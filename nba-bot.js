@@ -6,7 +6,11 @@ require('dotenv').config({ path: './keys.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
+const browser = await puppeteer.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox'], // Required for Render
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null // Use default if not set
+});
 const client = new TwitterApi({
   appKey: process.env.TWITTER_APP_KEY,
   appSecret: process.env.TWITTER_APP_SECRET,
