@@ -109,7 +109,7 @@ async function getStandings() {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/standings', {
       headers: {
-        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+        'X-RapidAPI-Key': process.env.RapidAPI_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
       params: {
