@@ -195,8 +195,8 @@ async function postNBATweet() {
     const mediaIds = [];
     const logoPaths = [
       path.join(__dirname, 'logos', 'NBA.png'),
-      path.join(__dirname, 'logos', 'EasternConference.png'),
-      path.join(__dirname, 'logos', 'WesternConference.png'),
+      path.join(__dirname, 'logos', 'east.png'),
+      path.join(__dirname, 'logos', 'west.png'),
     ];
 
     for (const logoPath of logoPaths) {
