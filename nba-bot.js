@@ -1,7 +1,8 @@
 const { TwitterApi } = require('twitter-api-v2');
 const schedule = require('node-schedule');
 const express = require('express');
-const NBA = require('nba-api-client');
+const axios = require('axios');
+const cheerio = require('cheerio');
 require('dotenv').config({ path: './keys.env' });
 
 const app = express();
@@ -37,74 +38,95 @@ const getDateStrings = () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     return {
-        today: today.toISOString().split('T')[0], // Format YYYY-MM-DD
-        yesterday: yesterday.toISOString().split('T')[0],
+        today: today.toISOString().split('T')[0].replace(/-/g, ''), // Format YYYYMMDD pour ESPN
+        yesterday: yesterday.toISOString().split('T')[0].replace(/-/g, ''),
     };
 };
 
-// Récupérer un résultat récent avec nba-api-client
+// Récupérer un résultat récent via ESPN
 async function getRecentGameResult() {
     const { today, yesterday } = getDateStrings();
+    const urlToday = `https://www.espn.com/nba/scoreboard/_/date/${today}`;
 
-    console.log("Date aujourd'hui:", today);
-    console.log("Date hier:", yesterday);
+    console.log("URL aujourd'hui:", urlToday);
 
     try {
-        const games = await NBA.getGamesInDateRange(today, today);
-        console.log("Réponse complète aujourd'hui:", JSON.stringify(games, null, 2));
+        const { data } = await axios.get(urlToday);
+        const $ = cheerio.load(data);
+        const games = [];
+        
+        $('.ScoreboardScoreCell').each((i, el) => {
+            const teams = $(el).find('.ScoreCell_Score--name').text().split(/(?=[A-Z]{2,3})/);
+            const scores = $(el).find('.ScoreCell_Score--value').text().split(/(?=\d+)/).filter(Boolean);
+            if (teams.length >= 2 && scores.length >= 2) {
+                games.push(`${teams[0]} ${scores[0]} - ${teams[1]} ${scores[1]} (Final)`);
+            }
+        });
+
+        console.log("Matchs trouvés aujourd'hui:", games);
 
         if (!games || games.length === 0) {
-            console.log("Aucun match aujourd'hui, tentative pour hier...");
-            const yesterdayGames = await NBA.getGamesInDateRange(yesterday, yesterday);
-            console.log("Réponse complète hier:", JSON.stringify(yesterdayGames, null, 2));
+            const urlYesterday = `https://www.espn.com/nba/scoreboard/_/date/${yesterday}`;
+            console.log("Aucun match aujourd'hui, URL hier:", urlYesterday);
+            const yesterdayData = await axios.get(urlYesterday);
+            const $y = cheerio.load(yesterdayData.data);
+            const yesterdayGames = [];
+
+            $y('.ScoreboardScoreCell').each((i, el) => {
+                const teams = $y(el).find('.ScoreCell_Score--name').text().split(/(?=[A-Z]{2,3})/);
+                const scores = $y(el).find('.ScoreCell_Score--value').text().split(/(?=\d+)/).filter(Boolean);
+                if (teams.length >= 2 && scores.length >= 2) {
+                    yesterdayGames.push(`${teams[0]} ${scores[0]} - ${teams[1]} ${scores[1]} (Final, Yesterday)`);
+                }
+            });
+
+            console.log("Matchs trouvés hier:", yesterdayGames);
 
             if (!yesterdayGames || yesterdayGames.length === 0) {
                 const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-                return staticGame.game; // Supprimé [Static Fallback]
+                return staticGame.game;
             }
 
-            const game = yesterdayGames[Math.floor(Math.random() * yesterdayGames.length)];
-            return `${game.hTeam.triCode} ${game.hTeam.score} - ${game.vTeam.triCode} ${game.vTeam.score} (Final, Yesterday)`;
+            return yesterdayGames[Math.floor(Math.random() * yesterdayGames.length)];
         }
 
-        const game = games[Math.floor(Math.random() * games.length)];
-        return `${game.hTeam.triCode} ${game.hTeam.score} - ${game.vTeam.triCode} ${game.vTeam.score} (Final)`;
+        return games[Math.floor(Math.random() * games.length)];
     } catch (error) {
-        console.error("Erreur NBA API (getRecentGameResult):", error.message);
+        console.error("Erreur scraping ESPN (getRecentGameResult):", error.message);
         const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-        return staticGame.game; // Supprimé [Static Fallback]
+        return staticGame.game;
     }
 }
 
-// Récupérer une stat aléatoire
+// Récupérer une stat aléatoire (simplifiée pour rester sur les scores d'équipe)
 async function getRandomStat() {
     const { today } = getDateStrings();
+    const url = `https://www.espn.com/nba/scoreboard/_/date/${today}`;
 
     try {
-        const games = await NBA.getGamesInDateRange(today, today);
-        console.log("Réponse complète pour stats:", JSON.stringify(games, null, 2));
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+        const games = [];
+
+        $('.ScoreboardScoreCell').each((i, el) => {
+            const teams = $(el).find('.ScoreCell_Score--name').text().split(/(?=[A-Z]{2,3})/);
+            const scores = $(el).find('.ScoreCell_Score--value').text().split(/(?=\d+)/).filter(Boolean);
+            if (teams.length >= 2 && scores.length >= 2) {
+                games.push({ team: teams[0], points: scores[0] });
+            }
+        });
 
         if (!games || games.length === 0) {
             const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return staticStat.stat; // Supprimé [Static Fallback]
+            return staticStat.stat;
         }
 
         const game = games[Math.floor(Math.random() * games.length)];
-        const boxScore = await NBA.boxScore({ GameID: game.gameId });
-        console.log("Box Score:", JSON.stringify(boxScore, null, 2));
-        const playerStats = boxScore.stats.activePlayers;
-
-        if (!playerStats || playerStats.length === 0) {
-            const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return staticStat.stat; // Supprimé [Static Fallback]
-        }
-
-        const player = playerStats[Math.floor(Math.random() * playerStats.length)];
-        return `${player.firstName} ${player.lastName} a marqué ${player.points} points pour ${player.teamTricode}.`;
+        return `${game.team} a marqué ${game.points} points dans le match.`;
     } catch (error) {
-        console.error("Erreur NBA API (getRandomStat):", error.message);
+        console.error("Erreur scraping ESPN (getRandomStat):", error.message);
         const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-        return staticStat.stat; // Supprimé [Static Fallback]
+        return staticStat.stat;
     }
 }
 
