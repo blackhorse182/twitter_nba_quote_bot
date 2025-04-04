@@ -79,7 +79,7 @@ async function getRecentGameResult() {
     } catch (error) {
         console.error("Erreur API Basketball (getRecentGameResult):", error.message);
         const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-        return `${staticGame.game} [Static Fallback]`;
+        return `${staticGame.game}`;
     }
 }
 
@@ -98,7 +98,7 @@ async function getRandomStat() {
         const games = response.data.response;
         if (games.length === 0) {
             const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return `${staticStat.stat} [Static Fallback]`;
+            return `${staticStat.stat}`;
         }
 
         const game = games[Math.floor(Math.random() * games.length)];
