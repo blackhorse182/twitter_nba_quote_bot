@@ -147,7 +147,12 @@ async function getAllGamesPost() {
       teamHashtags.add(`#${game.homeTeam.replace(/\s+/g, '')}`);
       teamHashtags.add(`#${game.awayTeam.replace(/\s+/g, '')}`);
 
-      
+      // Récupérer et ajouter le top joueur pour chaque match
+      const topPlayer = await getTopPlayerStats(game.gameId);
+      if (topPlayer) {
+        const playerLine = `${topPlayer.name}: ${topPlayer.points}pts, ${topPlayer.rebounds}reb, ${topPlayer.assists}ast\n`;
+        postContent += playerLine;
+      }
     }
 
     const standings = await getStandings();
