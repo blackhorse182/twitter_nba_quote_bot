@@ -20,17 +20,15 @@ async function getNBAResults() {
   try {
     const today = new Date();
     const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1); // Check yesterday’s games
-    const dateStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
+    yesterday.setDate(today.getDate() - 1);
+    const dateStr = yesterday.toISOString().split('T')[0];
 
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
-        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY, // Add your RapidAPI key in .env
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
-      params: {
-        date: dateStr, // Fetch games for yesterday
-      },
+      params: { date: dateStr },
     });
 
     const games = response.data.response;
@@ -40,13 +38,14 @@ async function getNBAResults() {
     }
 
     const results = games.map(game => ({
+      gameId: game.id,
       date: new Date(game.date.start).toDateString(),
       homeTeam: game.teams.home.name,
       awayTeam: game.teams.visitors.name,
       score: `${game.scores.home.points}-${game.scores.visitors.points}`,
     }));
 
-    console.log('Résultats récupérés:', results);
+    console.log('Games retrieved:', results);
     return results;
   } catch (error) {
     console.error('API Error:', error.message);
@@ -54,18 +53,56 @@ async function getNBAResults() {
   }
 }
 
+async function getTopPlayerStats(gameId) {
+  try {
+    const response = await axios.get('https://api-nba-v1.p.rapidapi.com/statistics/players', {
+      headers: {
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
+      },
+      params: { game: gameId },
+    });
+
+    const players = response.data.response;
+    if (!players || players.length === 0) return null;
+
+    // Find the player with the most points
+    const topPlayer = players.reduce((prev, curr) =>
+      (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
+    );
+
+    return {
+      name: `${topPlayer.player.firstname} ${topPlayer.player.lastname}`,
+      points: topPlayer.points || '0',
+      rebounds: topPlayer.totReb || '0',
+      assists: topPlayer.assists || '0',
+    };
+  } catch (error) {
+    console.error(`Error fetching player stats for game ${gameId}:`, error.message);
+    return null;
+  }
+}
+
 async function getAllGamesPost() {
   try {
     const results = await getNBAResults();
-    if (results.length === 0) throw new Error("Aucun résultat trouvé.");
+    if (results.length === 0) throw new Error("No results found.");
 
     let postContent = `${results[0].date}:\n`;
     for (const game of results) {
       const gameLine = `${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
       postContent += gameLine;
+
+      // Get top player stats for this game
+      const topPlayer = await getTopPlayerStats(game.gameId);
+      if (topPlayer) {
+        const playerLine = `${topPlayer.name}: ${topPlayer.points} pts, ${topPlayer.rebounds} reb, ${topPlayer.assists} ast\n`;
+        postContent += playerLine;
+      }
     }
     postContent += hashtags;
 
+    // Truncate if over 280 characters
     if (postContent.length > 280) {
       const maxContentLength = 280 - hashtags.length - 4;
       postContent = `${postContent.substring(0, maxContentLength)}... ${hashtags}`;
@@ -73,32 +110,32 @@ async function getAllGamesPost() {
 
     return postContent;
   } catch (error) {
-    console.error('Erreur lors de la récupération des résultats NBA:', error.message);
-    return 'Erreur lors de la récupération des résultats NBA.';
+    console.error('Error retrieving NBA results:', error.message);
+    return 'Error retrieving NBA results.';
   }
 }
 
 async function postNBATweet() {
   try {
     const content = await getAllGamesPost();
-    if (content === 'Erreur lors de la récupération des résultats NBA.') {
+    if (content === 'Error retrieving NBA results.') {
       console.log('No game results available, skipping tweet.');
       return;
     }
-    if (typeof content !== 'string') throw new Error("Contenu invalide.");
+    if (typeof content !== 'string') throw new Error("Invalid content.");
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const tweet = `${content} [${timestamp}]`;
 
     if (tweet.length > 280) {
       const shortTweet = `${content.substring(0, 280 - timestamp.length - 4)}... [${timestamp}]`;
       await client.v2.tweet(shortTweet);
-      console.log(`Tweet court envoyé: ${shortTweet}`);
+      console.log(`Short tweet posted: ${shortTweet}`);
     } else {
       await client.v2.tweet(tweet);
-      console.log(`Tweet envoyé: ${tweet}`);
+      console.log(`Tweet posted: ${tweet}`);
     }
   } catch (error) {
-    console.error("Erreur lors de l'envoi du tweet:", error.message);
+    console.error("Error posting tweet:", error.message);
     if (error.code === 429) {
       console.log('Rate limit hit. Waiting 15 minutes...');
       await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
@@ -108,11 +145,11 @@ async function postNBATweet() {
 }
 
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweet());
-postNBATweet().then(() => console.log("Premier tweet envoyé"));
+postNBATweet().then(() => console.log("First tweet posted"));
 
-app.get('/', (req, res) => res.send('NBA Twitter Bot en fonctionnement!'));
+app.get('/', (req, res) => res.send('NBA Twitter Bot running!'));
 app.listen(PORT, () => {
-  console.log(`NBA Bot démarré! Publication toutes les 24 heures. Serveur en fonctionnement sur le port ${PORT}`);
+  console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
 
-getAllGamesPost().then(result => console.log("Résultat de getAllGamesPost:", result));
+getAllGamesPost().then(result => console.log("Result of getAllGamesPost:", result));
