@@ -1,8 +1,8 @@
 const { TwitterApi } = require('twitter-api-v2');
 const schedule = require('node-schedule');
-const axios = require('axios');
 const express = require('express');
-require('dotenv').config();
+const NBA = require('nba-api-client'); // Nouvelle dépendance
+require('dotenv').config({ path: './keys.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,9 +15,7 @@ const client = new TwitterApi({
 });
 
 const hashtags = "#NBA #Basketball #Stats";
-const API_KEY = process.env.API_BASKETBALL_KEY; // Clé chargée depuis .env
 
-// Données statiques de secours (inchangées)
 const staticFallbackGames = [
     { game: "Bulls 87 - Jazz 86 (Final, 1998 Finals) - Jordan's 'Last Shot'", video: "https://www.youtube.com/watch?v=vdPQ3QxDZ1s" },
     { game: "Cavs 93 - Warriors 89 (Final, 2016 Finals) - LeBron's Block & Kyrie's 3", video: "https://www.youtube.com/watch?v=jL4pXNfN_LI" },
@@ -34,103 +32,93 @@ const staticFallbackStats = [
     { stat: "Ray Allen hit a game-tying 3-pointer with 5.2 seconds left for Heat (2013 Finals).", video: "https://www.youtube.com/watch?v=YDiXQ7ST7XU" }
 ];
 
-// Fonction pour obtenir les dates
 const getDateStrings = () => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     return {
-        today: today.toISOString().split('T')[0], // Format YYYY-MM-DD
-        yesterday: yesterday.toISOString().split('T')[0],
+        today: today.toISOString().split('T')[0].replace(/-/g, ''), // Format YYYYMMDD
+        yesterday: yesterday.toISOString().split('T')[0].replace(/-/g, ''),
     };
 };
 
-// Récupérer un résultat de match récent via API Basketball
+// Récupérer un résultat récent avec nba-api-client
 async function getRecentGameResult() {
     const { today, yesterday } = getDateStrings();
-    const url = `https://v1.basketball.api-sports.io/games?league=12&season=2024-2025&date=${today}`;
 
     try {
-        const response = await axios.get(url, {
-            headers: {
-                'x-apisports-key': API_KEY, // Votre clé : d4e83ba1dc44a2aa020480241e57af83
-            },
-        });
+        const games = await NBA.scoreboardV2({ GameDate: today });
+        const gameData = games.GameHeader;
+        console.log("Données brutes des matchs aujourd'hui:", gameData);
 
-        const games = response.data.response;
-        if (games.length === 0) {
-            const yesterdayUrl = `https://v1.basketball.api-sports.io/games?league=12&season=2024-2025&date=${yesterday}`;
-            const yesterdayResponse = await axios.get(yesterdayUrl, {
-                headers: {
-                    'x-apisports-key': API_KEY,
-                },
-            });
-            const yesterdayGames = yesterdayResponse.data.response;
-            if (yesterdayGames.length === 0) {
+        if (!gameData || gameData.length === 0) {
+            const yesterdayGames = await NBA.scoreboardV2({ GameDate: yesterday });
+            const yesterdayData = yesterdayGames.GameHeader;
+            console.log("Données brutes des matchs hier:", yesterdayData);
+
+            if (!yesterdayData || yesterdayData.length === 0) {
                 const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
                 return `${staticGame.game} [Static Fallback]`;
             }
-            const game = yesterdayGames[Math.floor(Math.random() * yesterdayGames.length)];
-            return `${game.teams.home.name} ${game.scores.home.total} - ${game.teams.away.name} ${game.scores.away.total} (Final, Yesterday)`;
+
+            const game = yesterdayData[Math.floor(Math.random() * yesterdayData.length)];
+            return `${game.HOME_TEAM_ABBREVIATION} ${game.HOME_TEAM_PTS} - ${game.VISITOR_TEAM_ABBREVIATION} ${game.VISITOR_TEAM_PTS} (Final, Yesterday)`;
         }
 
-        const game = games[Math.floor(Math.random() * games.length)];
-        return `${game.teams.home.name} ${game.scores.home.total} - ${game.teams.away.name} ${game.scores.away.total} (Final)`;
+        const game = gameData[Math.floor(Math.random() * gameData.length)];
+        return `${game.HOME_TEAM_ABBREVIATION} ${game.HOME_TEAM_PTS} - ${game.VISITOR_TEAM_ABBREVIATION} ${game.VISITOR_TEAM_PTS} (Final)`;
     } catch (error) {
-        console.error("Erreur API Basketball (getRecentGameResult):", error.message);
+        console.error("Erreur NBA API:", error.message);
         const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-        return `${staticGame.game}`;
+        return `${staticGame.game} [Static Fallback]`;
     }
 }
 
-// Récupérer une statistique aléatoire via API Basketball
+// Récupérer une stat aléatoire (exemple basique avec box score)
 async function getRandomStat() {
     const { today } = getDateStrings();
-    const url = `https://v1.basketball.api-sports.io/games?league=12&season=2024-2025&date=${today}`;
 
     try {
-        const response = await axios.get(url, {
-            headers: {
-                'x-apisports-key': API_KEY,
-            },
-        });
+        const games = await NBA.scoreboardV2({ GameDate: today });
+        const gameData = games.GameHeader;
 
-        const games = response.data.response;
-        if (games.length === 0) {
+        if (!gameData || gameData.length === 0) {
             const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return `${staticStat.stat}`;
+            return `${staticStat.stat} [Static Fallback]`;
         }
 
-        const game = games[Math.floor(Math.random() * games.length)];
-        const statsUrl = `https://v1.basketball.api-sports.io/statistics?game=${game.id}`;
-        const statsResponse = await axios.get(statsUrl, {
-            headers: {
-                'x-apisports-key': API_KEY,
-            },
-        });
+        const game = gameData[Math.floor(Math.random() * gameData.length)];
+        const boxScore = await NBA.boxScoreTraditionalV2({ GameID: game.GAME_ID });
+        const playerStats = boxScore.PlayerStats;
 
-        const teamStats = statsResponse.data.response[0].statistics[0]; // Stats de l'équipe domicile
-        return `${game.teams.home.name} a marqué ${teamStats.points} points dans le match.`;
+        if (!playerStats || playerStats.length === 0) {
+            const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
+            return `${staticStat.stat} [Static Fallback]`;
+        }
+
+        const player = playerStats[Math.floor(Math.random() * playerStats.length)];
+        return `${player.PLAYER_NAME} a marqué ${player.PTS} points pour ${player.TEAM_ABBREVIATION}.`;
     } catch (error) {
-        console.error("Erreur API Basketball (getRandomStat):", error.message);
+        console.error("Erreur NBA API (getRandomStat):", error.message);
         const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-        return `${staticStat.stat}`;
+        return `${staticStat.stat} [Static Fallback]`;
     }
 }
 
-// Sélectionner aléatoirement entre match et stat
 async function getRandomNBAPost() {
     const isGameResult = Math.random() < 0.5;
     return isGameResult ? await getRecentGameResult() : await getRandomStat();
 }
 
-// Poster sur Twitter
 async function postNBATweet() {
-    const content = await getRandomNBAPost();
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const tweet = `${content} ${hashtags} [${timestamp}]`;
-
     try {
+        const content = await getRandomNBAPost();
+        if (typeof content !== 'string') {
+            throw new Error("Contenu invalide, attendu une chaîne : " + content);
+        }
+        const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const tweet = `${content} ${hashtags} [${timestamp}]`;
+
         if (tweet.length > 280) {
             const shortTweet = `${content.substring(0, 280 - hashtags.length - timestamp.length - 5)}... ${hashtags} [${timestamp}]`;
             await client.v2.tweet(shortTweet);
@@ -140,20 +128,19 @@ async function postNBATweet() {
             console.log(`Tweet posted: ${tweet}`);
         }
     } catch (error) {
-        console.error("Erreur lors de la publication du tweet:", error.message);
+        console.error("Erreur dans postNBATweet:", error.message);
     }
 }
 
-// Planifier les posts toutes les 6 heures
-schedule.scheduleJob('0 */6 * * *', () => {
-    postNBATweet();
+schedule.scheduleJob('0 */6 * * *', async () => {
+    await postNBATweet();
 });
 
-// Post initial au démarrage
-postNBATweet();
+getRandomNBAPost().then(result => console.log("Résultat de getRandomNBAPost:", result));
 
-// Démarrer le serveur Express
-app.get('/run', (req, res) => {
+postNBATweet().then(() => console.log("Post initial envoyé"));
+
+app.get('/', (req, res) => {
     res.send('NBA Twitter Bot is running!');
 });
 
