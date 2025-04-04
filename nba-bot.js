@@ -147,14 +147,7 @@ async function getAllGamesPost() {
       teamHashtags.add(`#${game.homeTeam.replace(/\s+/g, '')}`);
       teamHashtags.add(`#${game.awayTeam.replace(/\s+/g, '')}`);
 
-      if (!statsAdded) {
-        const topPlayer = await getTopPlayerStats(game.gameId);
-        if (topPlayer) {
-          const playerLine = `${topPlayer.name}: ${topPlayer.points}pts, ${topPlayer.rebounds}reb, ${topPlayer.assists}ast\n`;
-          postContent += playerLine;
-          statsAdded = true;
-        }
-      }
+      
     }
 
     const standings = await getStandings();
