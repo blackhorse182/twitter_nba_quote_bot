@@ -82,7 +82,7 @@ async function getTopPlayerStats(gameId, retries = 3) {
       assists: topPlayer.assists || '0',
     };
 
-    console.log(`Top player for game ${gameId}: ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
+    console.log(`Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
     return topPlayerData;
   } catch (error) {
     console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message);
@@ -131,106 +131,77 @@ async function uploadMedia(filePath) {
   }
 }
 
-async function getAllGamesPost() {
+async function postMatchTweet(game, timestamp) {
+  try {
+    let tweetContent = `${game.date}:\n${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
+    const topPlayer = await getTopPlayerStats(game.gameId);
+    if (topPlayer) {
+      tweetContent += `${topPlayer.name}: ${topPlayer.points}pts, ${topPlayer.rebounds}reb, ${topPlayer.assists}ast\n`;
+    }
+    const teamHashtags = `#${game.homeTeam.replace(/\s+/g, '')} #${game.awayTeam.replace(/\s+/g, '')}`;
+    tweetContent += `${baseHashtags} ${teamHashtags} [${timestamp}]`;
+
+    const logoPath = path.join(__dirname, 'logos', 'NBA.png');
+    const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath)] : [];
+
+    await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
+    console.log(`Match tweet posted: ${tweetContent}`);
+  } catch (error) {
+    console.error(`Error posting match tweet for game ${game.gameId}:`, error.message);
+  }
+}
+
+async function postConferenceTweet(conference, teams, timestamp) {
+  try {
+    const confName = conference === 'east' ? 'Eastern' : 'Western';
+    let tweetContent = `${confName} Conference Top 3 - ${new Date().toDateString()}:\n`;
+    teams.forEach(team => {
+      tweetContent += `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})\n`;
+    });
+    tweetContent += `${baseHashtags} #${confName}Conference [${timestamp}]`;
+
+    const logoPath = path.join(__dirname, 'logos', `${confName}Conference.png`);
+    const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath)] : [];
+
+    await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
+    console.log(`Conference tweet posted: ${tweetContent}`);
+  } catch (error) {
+    console.error(`Error posting ${conference} conference tweet:`, error.message);
+  }
+}
+
+async function postNBATweets() {
   try {
     const results = await getNBAResults();
-    if (results.length === 0) throw new Error("No results found.");
-
-    let postContent = `${results[0].date}:\n`;
-    let statsAdded = false;
-    let teamHashtags = new Set();
-
-    for (const game of results) {
-      const gameLine = `${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
-      postContent += gameLine;
-
-      teamHashtags.add(`#${game.homeTeam.replace(/\s+/g, '')}`);
-      teamHashtags.add(`#${game.awayTeam.replace(/\s+/g, '')}`);
-
-      // Récupérer et ajouter le top joueur pour chaque match
-      const topPlayer = await getTopPlayerStats(game.gameId);
-      if (topPlayer) {
-        const playerLine = `${topPlayer.name}: ${topPlayer.points}pts, ${topPlayer.rebounds}reb, ${topPlayer.assists}ast\n`;
-        postContent += playerLine;
+    if (results.length === 0) {
+      console.log('No game results available, skipping match tweets.');
+    } else {
+      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      for (const game of results) {
+        await postMatchTweet(game, timestamp);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Délai de 2s entre tweets
       }
     }
 
     const standings = await getStandings();
-    postContent += "\nEast Top 3:\n";
-    standings.east.forEach(team => {
-      postContent += `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})\n`;
-    });
-    postContent += "West Top 3:\n";
-    standings.west.forEach(team => {
-      postContent += `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})\n`;
-    });
-
-    const allHashtags = `${baseHashtags} ${Array.from(teamHashtags).join(' ')}`;
-    postContent += allHashtags;
-
-    if (postContent.length > 280) {
-      const maxContentLength = 280 - allHashtags.length - 4;
-      postContent = `${postContent.substring(0, maxContentLength)}... ${allHashtags}`;
-    }
-
-    return postContent;
-  } catch (error) {
-    console.error('Error retrieving NBA results:', error.message);
-    return 'Error retrieving NBA results.';
-  }
-}
-
-async function postNBATweet() {
-  try {
-    const content = await getAllGamesPost();
-    if (content === 'Error retrieving NBA results.') {
-      console.log('No game results available, skipping tweet.');
-      return;
-    }
-    if (typeof content !== 'string') throw new Error("Invalid content.");
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-
-    const mediaIds = [];
-    const logoPaths = [
-      path.join(__dirname, 'logos', 'NBA.png'),
-      path.join(__dirname, 'logos', 'east.png'),
-      path.join(__dirname, 'logos', 'west.png'),
-    ];
-
-    for (const logoPath of logoPaths) {
-      if (fs.existsSync(logoPath)) {
-        const mediaId = await uploadMedia(logoPath);
-        if (mediaId) mediaIds.push(mediaId);
-      } else {
-        console.log(`Logo not found at: ${logoPath}`);
-      }
-    }
-
-    const tweet = `${content} [${timestamp}]`;
-    if (tweet.length > 280) {
-      const shortTweet = `${content.substring(0, 280 - timestamp.length - 4)}... [${timestamp}]`;
-      await client.v2.tweet({ text: shortTweet, media: { media_ids: mediaIds } });
-      console.log(`Short tweet posted with logos: ${shortTweet}`);
-    } else {
-      await client.v2.tweet({ text: tweet, media: { media_ids: mediaIds } });
-      console.log(`Tweet posted with logos: ${tweet}`);
-    }
+    await postConferenceTweet('east', standings.east, timestamp);
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Délai de 2s
+    await postConferenceTweet('west', standings.west, timestamp);
   } catch (error) {
-    console.error("Error posting tweet:", error.message);
+    console.error("Error in postNBATweets:", error.message);
     if (error.code === 429) {
       console.log('Twitter rate limit hit. Waiting 15 minutes...');
       await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
-      await postNBATweet();
+      await postNBATweets();
     }
   }
 }
 
-schedule.scheduleJob('0 0 * * *', async () => await postNBATweet());
-postNBATweet().then(() => console.log("First tweet posted"));
+schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
+postNBATweets().then(() => console.log("Tweets posted"));
 
-app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
+app.get('/', (req, res) => res.send('NBA Twitter Bot running!'));
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
-
-getAllGamesPost().then(result => console.log("Result of getAllGamesPost:", result));
