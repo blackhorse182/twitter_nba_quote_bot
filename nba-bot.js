@@ -1,7 +1,7 @@
 const { TwitterApi } = require('twitter-api-v2');
 const schedule = require('node-schedule');
 const express = require('express');
-const NBA = require('nba-api-client'); // Nouvelle dépendance
+const NBA = require('nba-api-client');
 require('dotenv').config({ path: './keys.env' });
 
 const app = express();
@@ -37,8 +37,8 @@ const getDateStrings = () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     return {
-        today: today.toISOString().split('T')[0].replace(/-/g, ''), // Format YYYYMMDD
-        yesterday: yesterday.toISOString().split('T')[0].replace(/-/g, ''),
+        today: today.toISOString().split('T')[0], // Format YYYY-MM-DD
+        yesterday: yesterday.toISOString().split('T')[0],
     };
 };
 
@@ -46,62 +46,65 @@ const getDateStrings = () => {
 async function getRecentGameResult() {
     const { today, yesterday } = getDateStrings();
 
+    console.log("Date aujourd'hui:", today);
+    console.log("Date hier:", yesterday);
+
     try {
-        const games = await NBA.scoreboardV2({ GameDate: today });
-        const gameData = games.GameHeader;
-        console.log("Données brutes des matchs aujourd'hui:", gameData);
+        const games = await NBA.getGamesInDateRange(today, today);
+        console.log("Réponse complète aujourd'hui:", JSON.stringify(games, null, 2));
 
-        if (!gameData || gameData.length === 0) {
-            const yesterdayGames = await NBA.scoreboardV2({ GameDate: yesterday });
-            const yesterdayData = yesterdayGames.GameHeader;
-            console.log("Données brutes des matchs hier:", yesterdayData);
+        if (!games || games.length === 0) {
+            console.log("Aucun match aujourd'hui, tentative pour hier...");
+            const yesterdayGames = await NBA.getGamesInDateRange(yesterday, yesterday);
+            console.log("Réponse complète hier:", JSON.stringify(yesterdayGames, null, 2));
 
-            if (!yesterdayData || yesterdayData.length === 0) {
+            if (!yesterdayGames || yesterdayGames.length === 0) {
                 const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-                return `${staticGame.game} [Static Fallback]`;
+                return staticGame.game; // Supprimé [Static Fallback]
             }
 
-            const game = yesterdayData[Math.floor(Math.random() * yesterdayData.length)];
-            return `${game.HOME_TEAM_ABBREVIATION} ${game.HOME_TEAM_PTS} - ${game.VISITOR_TEAM_ABBREVIATION} ${game.VISITOR_TEAM_PTS} (Final, Yesterday)`;
+            const game = yesterdayGames[Math.floor(Math.random() * yesterdayGames.length)];
+            return `${game.hTeam.triCode} ${game.hTeam.score} - ${game.vTeam.triCode} ${game.vTeam.score} (Final, Yesterday)`;
         }
 
-        const game = gameData[Math.floor(Math.random() * gameData.length)];
-        return `${game.HOME_TEAM_ABBREVIATION} ${game.HOME_TEAM_PTS} - ${game.VISITOR_TEAM_ABBREVIATION} ${game.VISITOR_TEAM_PTS} (Final)`;
+        const game = games[Math.floor(Math.random() * games.length)];
+        return `${game.hTeam.triCode} ${game.hTeam.score} - ${game.vTeam.triCode} ${game.vTeam.score} (Final)`;
     } catch (error) {
-        console.error("Erreur NBA API:", error.message);
+        console.error("Erreur NBA API (getRecentGameResult):", error.message);
         const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-        return `${staticGame.game} [Static Fallback]`;
+        return staticGame.game; // Supprimé [Static Fallback]
     }
 }
 
-// Récupérer une stat aléatoire (exemple basique avec box score)
+// Récupérer une stat aléatoire
 async function getRandomStat() {
     const { today } = getDateStrings();
 
     try {
-        const games = await NBA.scoreboardV2({ GameDate: today });
-        const gameData = games.GameHeader;
+        const games = await NBA.getGamesInDateRange(today, today);
+        console.log("Réponse complète pour stats:", JSON.stringify(games, null, 2));
 
-        if (!gameData || gameData.length === 0) {
+        if (!games || games.length === 0) {
             const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return `${staticStat.stat} [Static Fallback]`;
+            return staticStat.stat; // Supprimé [Static Fallback]
         }
 
-        const game = gameData[Math.floor(Math.random() * gameData.length)];
-        const boxScore = await NBA.boxScoreTraditionalV2({ GameID: game.GAME_ID });
-        const playerStats = boxScore.PlayerStats;
+        const game = games[Math.floor(Math.random() * games.length)];
+        const boxScore = await NBA.boxScore({ GameID: game.gameId });
+        console.log("Box Score:", JSON.stringify(boxScore, null, 2));
+        const playerStats = boxScore.stats.activePlayers;
 
         if (!playerStats || playerStats.length === 0) {
             const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return `${staticStat.stat} [Static Fallback]`;
+            return staticStat.stat; // Supprimé [Static Fallback]
         }
 
         const player = playerStats[Math.floor(Math.random() * playerStats.length)];
-        return `${player.PLAYER_NAME} a marqué ${player.PTS} points pour ${player.TEAM_ABBREVIATION}.`;
+        return `${player.firstName} ${player.lastName} a marqué ${player.points} points pour ${player.teamTricode}.`;
     } catch (error) {
         console.error("Erreur NBA API (getRandomStat):", error.message);
         const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-        return `${staticStat.stat} [Static Fallback]`;
+        return staticStat.stat; // Supprimé [Static Fallback]
     }
 }
 
