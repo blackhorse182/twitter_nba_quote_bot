@@ -19,40 +19,36 @@ const hashtags = "#NBA #Basketball #Stats";
 async function getNBAResults() {
   try {
     const today = new Date();
-    const dates = [];
-    for (let i = 1; i <= 7; i++) { // Check last 7 days
-      const pastDate = new Date(today);
-      pastDate.setDate(today.getDate() - i);
-      dates.push(pastDate.toISOString().split('T')[0]); // YYYY-MM-DD
-    }
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1); // Check yesterday’s games
+    const dateStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    const response = await axios.get('https://www.balldontlie.io/api/v1/games', {
+    const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
+      headers: {
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY, // Add your RapidAPI key in .env
+        'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
+      },
       params: {
-        dates: dates,
-        per_page: 100,
+        date: dateStr, // Fetch games for yesterday
       },
     });
 
-    const games = response.data.data;
-    if (games.length === 0) {
-      console.log('No games found in the last 7 days:', dates);
+    const games = response.data.response;
+    if (!games || games.length === 0) {
+      console.log('No games found for', dateStr);
       return [];
     }
 
     const results = games.map(game => ({
-      date: new Date(game.date).toDateString(),
-      homeTeam: game.home_team.full_name,
-      awayTeam: game.visitor_team.full_name,
-      score: `${game.home_team_score}-${game.visitor_team_score}`,
+      date: new Date(game.date.start).toDateString(),
+      homeTeam: game.teams.home.name,
+      awayTeam: game.teams.visitors.name,
+      score: `${game.scores.home.points}-${game.scores.visitors.points}`,
     }));
 
     console.log('Résultats récupérés:', results);
     return results;
   } catch (error) {
-    if (error.response && error.response.status === 404) {
-      console.log('No games found for the requested dates');
-      return [];
-    }
     console.error('API Error:', error.message);
     return [];
   }
