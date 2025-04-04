@@ -1,14 +1,17 @@
-const { TwitterApi } = require('twitter-api-v2');
-const schedule = require('node-schedule');
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config({ path: './keys.env' });
+// Importation des modules nécessaires
+const { TwitterApi } = require('twitter-api-v2'); // API Twitter
+const schedule = require('node-schedule'); // Planification des tâches
+const express = require('express'); // Serveur web
+const axios = require('axios'); // Requêtes HTTP
+const fs = require('fs'); // Gestion des fichiers
+const path = require('path'); // Gestion des chemins de fichiers
+require('dotenv').config({ path: './keys.env' }); // Chargement des variables d'environnement
 
+// Initialisation de l'application Express
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10000; // Port du serveur
 
+// Configuration du client Twitter
 const client = new TwitterApi({
   appKey: process.env.TWITTER_APP_KEY,
   appSecret: process.env.TWITTER_APP_SECRET,
@@ -16,15 +19,18 @@ const client = new TwitterApi({
   accessSecret: process.env.TWITTER_ACCESS_SECRET,
 });
 
+// Hashtags de base pour les tweets
 const baseHashtags = "#NBA #Basketball #Stats";
 
+// Fonction pour récupérer les résultats des matchs NBA
 async function getNBAResults() {
   try {
     const today = new Date();
     const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    const dateStr = yesterday.toISOString().split('T')[0];
+    yesterday.setDate(today.getDate() - 1); // Date d'hier
+    const dateStr = yesterday.toISOString().split('T')[0]; // Format ISO
 
+    // Requête à l'API NBA pour récupérer les matchs
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
         'X-RapidAPI-Key': process.env.RapidAPI_KEY,
@@ -39,6 +45,7 @@ async function getNBAResults() {
       return [];
     }
 
+    // Extraction des informations des matchs
     const results = games.map(game => ({
       gameId: game.id,
       date: new Date(game.date.start).toDateString(),
@@ -55,6 +62,7 @@ async function getNBAResults() {
   }
 }
 
+// Fonction pour récupérer les statistiques du meilleur joueur d'un match
 async function getTopPlayerStats(gameId, retries = 3) {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
@@ -71,6 +79,7 @@ async function getTopPlayerStats(gameId, retries = 3) {
       return null;
     }
 
+    // Trouver le joueur avec le plus de points
     const topPlayer = players.reduce((prev, curr) =>
       (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
     );
@@ -95,6 +104,7 @@ async function getTopPlayerStats(gameId, retries = 3) {
   }
 }
 
+// Fonction pour récupérer les classements des conférences
 async function getStandings() {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/standings', {
@@ -104,11 +114,12 @@ async function getStandings() {
       },
       params: {
         league: 'standard',
-        season: new Date().getFullYear() - 1,
+        season: new Date().getFullYear() - 1, // Saison précédente
       },
     });
 
     const standings = response.data.response;
+    // Top 3 équipes de chaque conférence
     const east = standings.filter(team => team.conference.name === 'east').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
     const west = standings.filter(team => team.conference.name === 'west').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
 
@@ -121,6 +132,7 @@ async function getStandings() {
   }
 }
 
+// Fonction pour uploader un média sur Twitter
 async function uploadMedia(filePath) {
   try {
     const mediaId = await client.v1.uploadMedia(filePath);
@@ -131,6 +143,7 @@ async function uploadMedia(filePath) {
   }
 }
 
+// Fonction pour poster un tweet sur un match
 async function postMatchTweet(game, timestamp) {
   try {
     let tweetContent = `${game.date}:\n${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
@@ -151,6 +164,7 @@ async function postMatchTweet(game, timestamp) {
   }
 }
 
+// Fonction pour poster un tweet sur les classements d'une conférence
 async function postConferenceTweet(conference, teams, timestamp) {
   try {
     const confName = conference === 'east' ? 'Eastern' : 'Western';
@@ -170,6 +184,7 @@ async function postConferenceTweet(conference, teams, timestamp) {
   }
 }
 
+// Fonction principale pour poster les tweets NBA
 async function postNBATweets() {
   try {
     const results = await getNBAResults();
@@ -198,10 +213,14 @@ async function postNBATweets() {
   }
 }
 
+// Planification pour exécuter la fonction tous les jours à minuit
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
 postNBATweets().then(() => console.log("Tweets posted"));
 
+// Route de base pour vérifier que le bot fonctionne
 app.get('/', (req, res) => res.send('NBA Twitter Bot running!'));
+
+// Lancement du serveur Express
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
