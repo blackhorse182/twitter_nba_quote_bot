@@ -33,7 +33,7 @@ async function getNBAResults() {
     // Requête à l'API NBA pour récupérer les matchs
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
-        'X-RapidAPI-Key': process.env.RapidAPI_KEY,
+        'X-RapidAPI-Key': process.env.Rapid_API_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
       params: { date: dateStr },
