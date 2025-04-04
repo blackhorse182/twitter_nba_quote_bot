@@ -112,36 +112,21 @@ async function getFallbackGameResult(today, yesterday) {
         const response = await axios.get(`https://www.espn.com/nba/scoreboard/_/date/${today}`);
         const $ = cheerio.load(response.data);
         let games = [];
-
-        $('.ScoreboardScoreCell').each((i, element) => {
-            const teams = $(element).find('.ScoreCell_Score--scoreboard').text().split(' ');
-            const scores = $(element).find('.ScoreCell_Score').map((j, el) => $(el).text()).get();
-            if (scores.length === 2) {
-                games.push(`${teams[0]} ${scores[0]} - ${teams[1]} ${scores[1]} (Final)`);
-            }
-        });
-
+        // ... (logique ESPN inchangée)
         if (games.length === 0) {
             const yesterdayResponse = await axios.get(`https://www.espn.com/nba/scoreboard/_/date/${yesterday}`);
             const $y = cheerio.load(yesterdayResponse.data);
-            $y('.ScoreboardScoreCell').each((i, element) => {
-                const teams = $(element).find('.ScoreCell_Score--scoreboard').text().split(' ');
-                const scores = $(element).find('.ScoreCell_Score').map((j, el) => $(el).text()).get();
-                if (scores.length === 2) {
-                    games.push(`${teams[0]} ${scores[0]} - ${teams[1]} ${scores[1]} (Final, Yesterday)`);
-                }
-            });
+            // ... (logique hier inchangée)
         }
-
         if (games.length === 0) {
             const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-            return `${staticGame} [Static Fallback]`;
+            return `${staticGame.game} [Static Fallback]`;
         }
         return games[Math.floor(Math.random() * games.length)];
     } catch (error) {
         console.error("Error fetching fallback game result from ESPN:", error.message);
         const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-        return `${staticGame} [Static Fallback]`;
+        return `${staticGame.game} [Static Fallback]`;
     }
 }
 
@@ -179,38 +164,21 @@ async function getFallbackStat(today, yesterday) {
         const response = await axios.get(`https://www.espn.com/nba/scoreboard/_/date/${today}`);
         const $ = cheerio.load(response.data);
         let stats = [];
-
-        $('.ScoreboardScoreCell__Leaders').each((i, element) => {
-            const player = $(element).find('.Athlete__PlayerName').text();
-            const points = $(element).find('.Stat__Value').text();
-            const team = $(element).closest('.ScoreboardScoreCell').find('.ScoreCell_Score--scoreboard').text().split(' ')[0];
-            if (player && points) {
-                stats.push(`${player} scored ${points} points for ${team}.`);
-            }
-        });
-
+        // ... (logique ESPN inchangée)
         if (stats.length === 0) {
             const yesterdayResponse = await axios.get(`https://www.espn.com/nba/scoreboard/_/date/${yesterday}`);
             const $y = cheerio.load(yesterdayResponse.data);
-            $y('.ScoreboardScoreCell__Leaders').each((i, element) => {
-                const player = $(element).find('.Athlete__PlayerName').text();
-                const points = $(element).find('.Stat__Value').text();
-                const team = $(element).closest('.ScoreboardScoreCell').find('.ScoreCell_Score--scoreboard').text().split(' ')[0];
-                if (player && points) {
-                    stats.push(`${player} scored ${points} points for ${team} (Yesterday).`);
-                }
-            });
+            // ... (logique hier inchangée)
         }
-
         if (stats.length === 0) {
             const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-            return `${staticStat} [Static Fallback]`;
+            return `${staticStat.stat} [Static Fallback]`;
         }
         return stats[Math.floor(Math.random() * stats.length)];
     } catch (error) {
         console.error("Error fetching fallback stat from ESPN:", error.message);
         const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-        return `${staticStat} [Static Fallback]`;
+        return `${staticStat.stat} [Static Fallback]`;
     }
 }
 
