@@ -43,7 +43,6 @@ async function getNBAResults() {
       }).filter(item => item.homeTeam !== 'N/A');
     });
 
-    // Fallback to yesterday if no results
     if (results.length === 0) {
       console.log('No games today, trying yesterday...');
       const yesterday = new Date(today);
@@ -112,6 +111,10 @@ async function getAllGamesPost() {
 async function postNBATweet() {
   try {
     const content = await getAllGamesPost();
+    if (content === 'Erreur lors de la récupération des résultats NBA.') {
+      console.log('No game results available, skipping tweet.');
+      return; // Skip tweeting if no results
+    }
     if (typeof content !== 'string') throw new Error("Contenu invalide.");
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const tweet = `${content} [${timestamp}]`;
@@ -134,12 +137,12 @@ async function postNBATweet() {
   }
 }
 
-schedule.scheduleJob('0 0 * * *', async () => await postNBATweet()); // Daily at midnight
+schedule.scheduleJob('0 *0 * * *', async () => await postNBATweet());
 postNBATweet().then(() => console.log("Premier tweet envoyé"));
 
 app.get('/run', (req, res) => res.send('NBA Twitter Bot en fonctionnement!'));
 app.listen(PORT, () => {
-  console.log(`NBA Bot démarré! Publication toutes les 6 heures. Serveur en fonctionnement sur le port ${PORT}`);
+  console.log(`NBA Bot démarré! Publication toutes les 24 heures. Serveur en fonctionnement sur le port ${PORT}`);
 });
 
 getAllGamesPost().then(result => console.log("Résultat de getAllGamesPost:", result));
