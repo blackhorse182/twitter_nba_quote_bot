@@ -19,25 +19,28 @@ const hashtags = "#NBA #Basketball #Stats";
 async function getNBAResults() {
   try {
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1); // Check yesterday’s games by default
-    const dateStr = yesterday.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const dates = [];
+    for (let i = 1; i <= 7; i++) { // Check last 7 days
+      const pastDate = new Date(today);
+      pastDate.setDate(today.getDate() - i);
+      dates.push(pastDate.toISOString().split('T')[0]); // YYYY-MM-DD
+    }
 
     const response = await axios.get('https://www.balldontlie.io/api/v1/games', {
       params: {
-        dates: [dateStr], // Fetch games for yesterday
-        per_page: 100,    // Ensure we get all games in one request
+        dates: dates,
+        per_page: 100,
       },
     });
 
     const games = response.data.data;
     if (games.length === 0) {
-      console.log('No games found for', dateStr);
+      console.log('No games found in the last 7 days:', dates);
       return [];
     }
 
     const results = games.map(game => ({
-      date: new Date(game.date).toDateString(), // e.g., "Thu Apr 03 2025"
+      date: new Date(game.date).toDateString(),
       homeTeam: game.home_team.full_name,
       awayTeam: game.visitor_team.full_name,
       score: `${game.home_team_score}-${game.visitor_team_score}`,
@@ -46,6 +49,10 @@ async function getNBAResults() {
     console.log('Résultats récupérés:', results);
     return results;
   } catch (error) {
+    if (error.response && error.response.status === 404) {
+      console.log('No games found for the requested dates');
+      return [];
+    }
     console.error('API Error:', error.message);
     return [];
   }
