@@ -153,7 +153,7 @@ schedule.scheduleJob('0 */6 * * *', () => {
 postNBATweet();
 
 // Démarrer le serveur Express
-app.get('/', (req, res) => {
+app.get('/run', (req, res) => {
     res.send('NBA Twitter Bot is running!');
 });
 
