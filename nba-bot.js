@@ -218,7 +218,7 @@ schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
 postNBATweets().then(() => console.log("Tweets posted"));
 
 // Route de base pour vérifier que le bot fonctionne
-app.get('/', (req, res) => res.send('NBA Twitter Bot running!'));
+app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
 
 // Lancement du serveur Express
 app.listen(PORT, () => {
