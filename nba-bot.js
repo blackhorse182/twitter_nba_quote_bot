@@ -53,35 +53,39 @@ async function getNBAResults() {
   }
 }
 
-async function getTopPlayerStats(gameId) {
+async function getTopPlayerStats(gameId, retries = 3) {
   try {
-    // Attempt to fetch game details which might include player stats
-    const response = await axios.get(`https://api-nba-v1.p.rapidapi.com/games/${gameId}`, {
+    const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
       headers: {
         'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
+      params: { game: gameId },
     });
 
-    const gameDetails = response.data.response[0];
-    if (!gameDetails || !gameDetails.players || gameDetails.players.length === 0) {
+    const players = response.data.response;
+    if (!players || players.length === 0) {
       console.log(`No player stats available for game ${gameId}`);
       return null;
     }
 
-    // Find top player by points (assuming players array exists)
-    const topPlayer = gameDetails.players.reduce((prev, curr) =>
+    const topPlayer = players.reduce((prev, curr) =>
       (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
     );
 
     return {
-      name: `${topPlayer.firstname} ${topPlayer.lastname}`,
+      name: `${topPlayer.player.firstname} ${topPlayer.player.lastname}`,
       points: topPlayer.points || '0',
       rebounds: topPlayer.totReb || '0',
       assists: topPlayer.assists || '0',
     };
   } catch (error) {
-    console.error(`Error fetching player stats for game ${gameId}:`, error.response?.status, error.message);
+    console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message);
+    if (error.response?.status === 429 && retries > 0) {
+      console.log(`Rate limit hit for game ${gameId}. Retrying in 15 seconds... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, 15 * 1000));
+      return getTopPlayerStats(gameId, retries - 1);
+    }
     return null;
   }
 }
@@ -92,16 +96,20 @@ async function getAllGamesPost() {
     if (results.length === 0) throw new Error("No results found.");
 
     let postContent = `${results[0].date}:\n`;
+    let statsAdded = false;
+
     for (const game of results) {
       const gameLine = `${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
       postContent += gameLine;
 
-      const topPlayer = await getTopPlayerStats(game.gameId);
-      if (topPlayer) {
-        const playerLine = `${topPlayer.name}: ${topPlayer.points} pts, ${topPlayer.rebounds} reb, ${topPlayer.assists} ast\n`;
-        postContent += playerLine;
-      } else {
-        postContent += "No top player stats available.\n";
+      // Only add stats for the first game to avoid rate limits
+      if (!statsAdded) {
+        const topPlayer = await getTopPlayerStats(game.gameId);
+        if (topPlayer) {
+          const playerLine = `${topPlayer.name}: ${topPlayer.points} pts, ${topPlayer.rebounds} reb, ${topPlayer.assists} ast\n`;
+          postContent += playerLine;
+          statsAdded = true;
+        }
       }
     }
     postContent += hashtags;
@@ -140,7 +148,7 @@ async function postNBATweet() {
   } catch (error) {
     console.error("Error posting tweet:", error.message);
     if (error.code === 429) {
-      console.log('Rate limit hit. Waiting 15 minutes...');
+      console.log('Twitter rate limit hit. Waiting 15 minutes...');
       await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
       await postNBATweet();
     }
