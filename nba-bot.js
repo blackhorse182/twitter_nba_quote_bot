@@ -21,7 +21,11 @@ const client = new TwitterApi({
 const hashtags = "#NBA #Basketball #Stats";
 
 async function getNBAResults() {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: '/usr/bin/google-chrome' // Common path on Render
+  });
   const page = await browser.newPage();
   try {
     const today = new Date();
