@@ -201,7 +201,7 @@ async function postNBATweets() {
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
 postNBATweets().then(() => console.log("Tweets posted"));
 
-app.get('/', (req, res) => res.send('NBA Twitter Bot running!'));
+app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
