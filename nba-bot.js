@@ -5,12 +5,8 @@ const puppeteer = require('puppeteer');
 require('dotenv').config({ path: './keys.env' });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const browser = await puppeteer.launch({
-  headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox'], // Required for Render
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null // Use default if not set
-});
+const PORT = process.env.PORT || 10000;
+
 const client = new TwitterApi({
   appKey: process.env.TWITTER_APP_KEY,
   appSecret: process.env.TWITTER_APP_SECRET,
@@ -23,8 +19,7 @@ const hashtags = "#NBA #Basketball #Stats";
 async function getNBAResults() {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    executablePath: '/usr/bin/google-chrome' // Common path on Render
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
   const page = await browser.newPage();
   try {
@@ -121,7 +116,7 @@ async function postNBATweet() {
     const content = await getAllGamesPost();
     if (content === 'Erreur lors de la récupération des résultats NBA.') {
       console.log('No game results available, skipping tweet.');
-      return; // Skip tweeting if no results
+      return;
     }
     if (typeof content !== 'string') throw new Error("Contenu invalide.");
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -145,10 +140,10 @@ async function postNBATweet() {
   }
 }
 
-schedule.scheduleJob('0 *0 * * *', async () => await postNBATweet());
+schedule.scheduleJob('0 0 * * *', async () => await postNBATweet());
 postNBATweet().then(() => console.log("Premier tweet envoyé"));
 
-app.get('/run', (req, res) => res.send('NBA Twitter Bot en fonctionnement!'));
+app.get('/', (req, res) => res.send('NBA Twitter Bot en fonctionnement!'));
 app.listen(PORT, () => {
   console.log(`NBA Bot démarré! Publication toutes les 24 heures. Serveur en fonctionnement sur le port ${PORT}`);
 });
