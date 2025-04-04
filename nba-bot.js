@@ -178,7 +178,7 @@ async function getFallbackStat(today, yesterday) {
     } catch (error) {
         console.error("Error fetching fallback stat from ESPN:", error.message);
         const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-        return `${staticStat.stat} [Static Fallback]`;
+        return `${staticStat.stat} `;
     }
 }
 
