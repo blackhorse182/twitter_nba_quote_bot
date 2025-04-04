@@ -1,147 +1,145 @@
 const { TwitterApi } = require('twitter-api-v2');
-const schedule = require('node-schedule'); // Ensure @types/node-schedule is installed for TypeScript
-const express = require('express'); // Ensure @types/express is installed for TypeScript
-const axios = require('axios');
+const schedule = require('node-schedule');
+const express = require('express');
+const puppeteer = require('puppeteer');
 require('dotenv').config({ path: './keys.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const client = new TwitterApi({
-    appKey: process.env.TWITTER_APP_KEY,
-    appSecret: process.env.TWITTER_APP_SECRET,
-    accessToken: process.env.TWITTER_ACCESS_TOKEN,
-    accessSecret: process.env.TWITTER_ACCESS_SECRET,
+  appKey: process.env.TWITTER_APP_KEY,
+  appSecret: process.env.TWITTER_APP_SECRET,
+  accessToken: process.env.TWITTER_ACCESS_TOKEN,
+  accessSecret: process.env.TWITTER_ACCESS_SECRET,
 });
 
 const hashtags = "#NBA #Basketball #Stats";
 
-const staticFallbackGames = [
-    { game: "Bulls 87 - Jazz 86 (Final, 1998 Finals) - Jordan's 'Last Shot'", video: "[invalid url, do not cite]" },
-    { game: "Cavs 93 - Warriors 89 (Final, 2016 Finals) - LeBron's Block & Kyrie's 3", video: "[invalid url, do not cite]" },
-    { game: "Lakers 100 - Celtics 96 (Final, 2010 Finals) - Kobe's 5th ring", video: "[invalid url, do not cite]" },
-    { game: "Spurs 81 - Pistons 74 (Final, 2005 Finals) - Duncan's dominance", video: "[invalid url, do not cite]" },
-    { game: "Heat 103 - Spurs 100 (OT, 2013 Finals) - Ray Allen's clutch 3", video: "[invalid url, do not cite]" }
-];
-
-const staticFallbackStats = [
-    { stat: "Michael Jordan scored 45 points for Bulls (1998 Finals - 'Last Shot').", video: "[invalid url, do not cite]" },
-    { stat: "LeBron James recorded a triple-double (27-11-11) for Cavs (2016 Finals).", video: "[invalid url, do not cite]" },
-    { stat: "Kobe Bryant scored 23 points and grabbed 15 rebounds for Lakers (2010 Finals).", video: "[invalid url, do not cite]" },
-    { stat: "Tim Duncan scored 25 points and 11 rebounds for Spurs (2005 Finals).", video: "[invalid url, do not cite]" },
-    { stat: "Ray Allen hit a game-tying 3-pointer with 5.2 seconds left for Heat (2013 Finals).", video: "[invalid url, do not cite]" }
-];
-
-const getDateStrings = () => {
+async function getNBAResults() {
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+  try {
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    return {
-        today: today.toISOString().split('T')[0].replace(/-/g, ''),
-        yesterday: yesterday.toISOString().split('T')[0].replace(/-/g, ''),
-    };
-};
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const year = today.getFullYear();
+    let url = `https://www.basketball-reference.com/boxscores/?month=${month}&day=${day}&year=${year}`;
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
-async function getRecentGameResult() {
-    const { today, yesterday } = getDateStrings();
-    const urlToday = `[invalid url, do not cite]`;
-    try {
-        const { data } = await axios.get(urlToday);
-        const events = data.events;
-        if (!events || events.length === 0) {
-            const urlYesterday = `[invalid url, do not cite]`;
-            const yesterdayData = await axios.get(urlYesterday);
-            const yesterdayEvents = yesterdayData.data.events;
-            if (!yesterdayEvents || yesterdayEvents.length === 0) {
-                return getStaticFallbackGame();
-            }
-            const event = yesterdayEvents[Math.floor(Math.random() * yesterdayEvents.length)];
-            const homeTeam = event.competitions[0].competitors.find(c => c.homeAway === 'home');
-            const awayTeam = event.competitions[0].competitors.find(c => c.homeAway === 'away');
-            return `${homeTeam.team.abbreviation} ${homeTeam.score} - ${awayTeam.team.abbreviation} ${awayTeam.score} (Final, Yesterday)`;
-        }
-        const event = events[Math.floor(Math.random() * events.length)];
-        const homeTeam = event.competitions[0].competitors.find(c => c.homeAway === 'home');
-        const awayTeam = event.competitions[0].competitors.find(c => c.homeAway === 'away');
-        return `${homeTeam.team.abbreviation} ${homeTeam.score} - ${awayTeam.team.abbreviation} ${awayTeam.score} (Final)`;
-    } catch (error) {
-        console.error("Error fetching from ESPN API:", error.message);
-        return getStaticFallbackGame();
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    let results = await page.evaluate(() => {
+      const games = Array.from(document.querySelectorAll('div.game_summary'));
+      return games.map(game => {
+        const date = document.querySelector('h1')?.textContent.trim() || 'N/A';
+        const teams = Array.from(game.querySelectorAll('table.teams tbody tr'));
+        const awayTeam = teams[0]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
+        const awayScore = teams[0]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
+        const homeTeam = teams[1]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
+        const homeScore = teams[1]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
+        const score = (homeScore !== 'N/A' && awayScore !== 'N/A') ? `${homeScore}-${awayScore}` : 'Final';
+        return { date, homeTeam, awayTeam, score };
+      }).filter(item => item.homeTeam !== 'N/A');
+    });
+
+    // Fallback to yesterday if no results
+    if (results.length === 0) {
+      console.log('No games today, trying yesterday...');
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const yMonth = String(yesterday.getMonth() + 1).padStart(2, '0');
+      const yDay = String(yesterday.getDate()).padStart(2, '0');
+      const yYear = yesterday.getFullYear();
+      url = `https://www.basketball-reference.com/boxscores/?month=${yMonth}&day=${yDay}&year=${yYear}`;
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      results = await page.evaluate(() => {
+        const games = Array.from(document.querySelectorAll('div.game_summary'));
+        return games.map(game => {
+          const date = document.querySelector('h1')?.textContent.trim() || 'N/A';
+          const teams = Array.from(game.querySelectorAll('table.teams tbody tr'));
+          const awayTeam = teams[0]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
+          const awayScore = teams[0]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
+          const homeTeam = teams[1]?.querySelector('td:first-child')?.textContent.trim() || 'N/A';
+          const homeScore = teams[1]?.querySelector('td:nth-child(2)')?.textContent.trim() || 'N/A';
+          const score = (homeScore !== 'N/A' && awayScore !== 'N/A') ? `${homeScore}-${awayScore}` : 'Final';
+          return { date, homeTeam, awayTeam, score };
+        }).filter(item => item.homeTeam !== 'N/A');
+      });
     }
-}
 
-function getStaticFallbackGame() {
-    const staticGame = staticFallbackGames[Math.floor(Math.random() * staticFallbackGames.length)];
-    return staticGame.game;
-}
-
-async function getRandomStat() {
-    const { today } = getDateStrings();
-    const urlToday = `[invalid url, do not cite]`;
-    try {
-        const { data } = await axios.get(urlToday);
-        const events = data.events;
-        if (!events || events.length === 0) {
-            return getStaticFallbackStat();
-        }
-        const event = events[Math.floor(Math.random() * events.length)];
-        const competitions = event.competitions[0];
-        const players = competitions.leaders[0].leaders;
-        if (!players || players.length === 0) {
-            return getStaticFallbackStat();
-        }
-        const player = players[Math.floor(Math.random() * players.length)];
-        return `${player.athlete.displayName} scored ${player.stats[0].value} points for ${player.team.abbreviation}.`;
-    } catch (error) {
-        console.error("Error fetching stats from ESPN API:", error.message);
-        return getStaticFallbackStat();
+    if (results.length === 0) {
+      console.error('Aucun résultat trouvé');
+    } else {
+      console.log('Résultats récupérés:', results);
     }
+
+    return results;
+  } catch (error) {
+    console.error('Scraping Error:', error.message);
+    return [];
+  } finally {
+    await browser.close();
+  }
 }
 
-function getStaticFallbackStat() {
-    const staticStat = staticFallbackStats[Math.floor(Math.random() * staticFallbackStats.length)];
-    return staticStat.stat;
-}
+async function getAllGamesPost() {
+  try {
+    const results = await getNBAResults();
+    if (results.length === 0) throw new Error("Aucun résultat trouvé.");
 
-async function getRandomNBAPost() {
-    const isGameResult = Math.random() < 0.5;
-    return isGameResult ? await getRecentGameResult() : await getRandomStat();
+    let postContent = `${results[0].date}:\n`;
+    for (const game of results) {
+      const gameLine = `${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
+      postContent += gameLine;
+    }
+    postContent += hashtags;
+
+    if (postContent.length > 280) {
+      const maxContentLength = 280 - hashtags.length - 4;
+      postContent = `${postContent.substring(0, maxContentLength)}... ${hashtags}`;
+    }
+
+    return postContent;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des résultats NBA:', error.message);
+    return 'Erreur lors de la récupération des résultats NBA.';
+  }
 }
 
 async function postNBATweet() {
-    try {
-        const content = await getRandomNBAPost();
-        if (typeof content !== 'string') {
-            throw new Error("Invalid content, expected a string: " + content);
-        }
-        const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const tweet = `${content} ${hashtags} [${timestamp}]`;
+  try {
+    const content = await getAllGamesPost();
+    if (typeof content !== 'string') throw new Error("Contenu invalide.");
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const tweet = `${content} [${timestamp}]`;
 
-        if (tweet.length > 280) {
-            const shortTweet = `${content.substring(0, 280 - hashtags.length - timestamp.length - 5)}... ${hashtags} [${timestamp}]`;
-            await client.v2.tweet(shortTweet);
-            console.log(`Short tweet posted: ${shortTweet}`);
-        } else {
-            await client.v2.tweet(tweet);
-            console.log(`Tweet posted: ${tweet}`);
-        }
-    } catch (error) {
-        console.error("Error in postNBATweet:", error.message);
+    if (tweet.length > 280) {
+      const shortTweet = `${content.substring(0, 280 - timestamp.length - 4)}... [${timestamp}]`;
+      await client.v2.tweet(shortTweet);
+      console.log(`Tweet court envoyé: ${shortTweet}`);
+    } else {
+      await client.v2.tweet(tweet);
+      console.log(`Tweet envoyé: ${tweet}`);
     }
+  } catch (error) {
+    console.error("Erreur lors de l'envoi du tweet:", error.message);
+    if (error.code === 429) {
+      console.log('Rate limit hit. Waiting 15 minutes...');
+      await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
+      await postNBATweet();
+    }
+  }
 }
 
-schedule.scheduleJob('0 */6 * * *', async () => {
-    await postNBATweet();
-});
+schedule.scheduleJob('0 0 * * *', async () => await postNBATweet()); // Daily at midnight
+postNBATweet().then(() => console.log("Premier tweet envoyé"));
 
-getRandomNBAPost().then(result => console.log("Result of getRandomNBAPost:", result));
-
-postNBATweet().then(() => console.log("Initial post sent"));
-
-app.get('/', (req, res) => {
-    res.send('NBA Twitter Bot is running!');
-});
-
+app.get('/run', (req, res) => res.send('NBA Twitter Bot en fonctionnement!'));
 app.listen(PORT, () => {
-    console.log(`NBA Bot started! Posting every 6 hours. Server running on port ${PORT}`);
+  console.log(`NBA Bot démarré! Publication toutes les 6 heures. Serveur en fonctionnement sur le port ${PORT}`);
 });
+
+getAllGamesPost().then(result => console.log("Résultat de getAllGamesPost:", result));
