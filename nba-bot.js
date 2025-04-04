@@ -5,7 +5,7 @@ const express = require('express'); // Serveur web
 const axios = require('axios'); // Requêtes HTTP
 const fs = require('fs'); // Gestion des fichiers
 const path = require('path'); // Gestion des chemins de fichiers
-require('dotenv').config({ path: './keys.env' }); // Chargement des variables d'environnement
+require('dotenv').config({ path: '.env' }); // Chargement des variables d'environnement
 
 // Initialisation de l'application Express
 const app = express();
