@@ -75,12 +75,15 @@ async function getTopPlayerStats(gameId, retries = 3) {
       (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
     );
 
-    return {
+    const topPlayerData = {
       name: `${topPlayer.player.firstname} ${topPlayer.player.lastname}`,
       points: topPlayer.points || '0',
       rebounds: topPlayer.totReb || '0',
       assists: topPlayer.assists || '0',
     };
+
+    console.log(`Top player for game ${gameId}: ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
+    return topPlayerData;
   } catch (error) {
     console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message);
     if (error.response?.status === 429 && retries > 0) {
@@ -101,7 +104,7 @@ async function getStandings() {
       },
       params: {
         league: 'standard',
-        season: new Date().getFullYear() - 1, // Saison actuelle (ajuste si nécessaire)
+        season: new Date().getFullYear() - 1,
       },
     });
 
@@ -109,6 +112,8 @@ async function getStandings() {
     const east = standings.filter(team => team.conference.name === 'east').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
     const west = standings.filter(team => team.conference.name === 'west').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
 
+    console.log('East Standings Top 3:', east.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
+    console.log('West Standings Top 3:', west.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
     return { east, west };
   } catch (error) {
     console.error('Error fetching standings:', error.message);
@@ -152,7 +157,6 @@ async function getAllGamesPost() {
       }
     }
 
-    // Ajouter les standings
     const standings = await getStandings();
     postContent += "\nEast Top 3:\n";
     standings.east.forEach(team => {
@@ -188,12 +192,11 @@ async function postNBATweet() {
     if (typeof content !== 'string') throw new Error("Invalid content.");
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    // Charger les logos
     const mediaIds = [];
     const logoPaths = [
-      path.join(__dirname, 'logos', 'nba.png'),
-      path.join(__dirname, 'logos', 'east.png'),
-      path.join(__dirname, 'logos', 'west.png'),
+      path.join(__dirname, 'logos', 'NBA.png'),
+      path.join(__dirname, 'logos', 'EasternConference.png'),
+      path.join(__dirname, 'logos', 'WesternConference.png'),
     ];
 
     for (const logoPath of logoPaths) {
@@ -227,7 +230,7 @@ async function postNBATweet() {
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweet());
 postNBATweet().then(() => console.log("First tweet posted"));
 
-app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
+app.get('/', (req, res) => res.send('NBA Twitter Bot running!'));
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
