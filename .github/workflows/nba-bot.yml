@@ -31,7 +31,7 @@ jobs:
           echo "TWITTER_APP_SECRET is set: ${TWITTER_APP_SECRET:+set}"
           echo "TWITTER_ACCESS_TOKEN is set: ${TWITTER_ACCESS_TOKEN:+set}"
           echo "TWITTER_ACCESS_SECRET is set: ${TWITTER_ACCESS_SECRET:+set}"
-          echo "Rapid_API_KEY is set: ${Rapid_API_KEY:+set}"
+          echo "Rapid_API_KEY is set: ${RAPID_API_KEY:+set}"
         env:
           TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
           TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
