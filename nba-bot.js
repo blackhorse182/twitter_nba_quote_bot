@@ -13,18 +13,18 @@ const baseHashtags = "#NBA #Basketball #Stats";
 
 async function uploadMedia(filePath, client) {
   try {
+    if (!fs.existsSync(filePath)) {
+      console.log(`Media file not found: ${filePath}`);
+      return null;
+    }
     const resizedImageBuffer = await sharp(filePath)
-      .resize({
-        width: 300,
-        height: 300,
-        fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
-      })
+      .resize({ width: 300, height: 300, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .toBuffer();
     const mediaId = await client.v1.uploadMedia(resizedImageBuffer, { type: 'png' });
+    console.log(`Uploaded media ID: ${mediaId}`);
     return mediaId;
   } catch (error) {
-    console.error(`Error processing or uploading media ${filePath}:`, error.message);
+    console.error(`Error uploading media ${filePath}:`, error.message);
     return null;
   }
 }
@@ -35,6 +35,7 @@ async function getNBAResults() {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     const dateStr = yesterday.toISOString().split('T')[0];
+    console.log(`Fetching games for date: ${dateStr}`);
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
         'X-RapidAPI-Key': process.env.Rapid_API_KEY,
@@ -42,7 +43,7 @@ async function getNBAResults() {
       },
       params: { date: dateStr },
     });
-    const games = response.data.response;
+    const games = response.data.response || [];
     if (!games || games.length === 0) {
       console.log('No games found for', dateStr);
       return [];
@@ -58,43 +59,62 @@ async function getNBAResults() {
     return results;
   } catch (error) {
     console.error('API Error in getNBAResults:', error.message);
-    return [];
+    throw error; // Laissez l’appelant gérer l’erreur (pour les nouvelles tentatives)
+  }
+}
+
+async function getNBAResultsWithRetry(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await getNBAResults();
+    } catch (error) {
+      if (error.response?.status === 429 && i < retries - 1) {
+        console.log(`Rate limit hit in getNBAResults, retrying in 15s (${retries - i - 1} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, 15000));
+      } else {
+        console.error('Failed to fetch game results after retries:', error.message);
+        return [];
+      }
+    }
   }
 }
 
 async function getTopPlayerStats(gameId, retries = 3) {
-  try {
-    const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
-      headers: {
-        'X-RapidAPI-Key': process.env.Rapid_API_KEY,
-        'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
-      },
-      params: { game: gameId },
-    });
-    const players = response.data.response;
-    if (!players || players.length === 0) {
-      console.log(`No player stats available for game ${gameId}`);
-      return null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
+        headers: {
+          'X-RapidAPI-Key': process.env.Rapid_API_KEY,
+          'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
+        },
+        params: { game: gameId },
+      });
+      const players = response.data.response || [];
+      if (!players || players.length === 0) {
+        console.log(`No player stats available for game ${gameId}`);
+        return null;
+      }
+      const topPlayer = players.reduce((prev, curr) =>
+        (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
+      );
+      const topPlayerData = {
+        name: `${topPlayer.player.firstname} ${topPlayer.player.lastname}`,
+        points: topPlayer.points || '0',
+        rebounds: topPlayer.totReb || '0',
+        assists: topPlayer.assists || '0',
+      };
+      console.log(`Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
+      return topPlayerData;
+    } catch (error) {
+      console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message);
+      if (error.response?.status === 429 && i < retries - 1) {
+        console.log(`Rate limit hit for game ${gameId}. Retrying in 15 seconds... (${retries - i - 1} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, 15000));
+      } else {
+        console.error('Failed to fetch player stats after retries:', error.message);
+        return null;
+      }
     }
-    const topPlayer = players.reduce((prev, curr) =>
-      (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
-    );
-    const topPlayerData = {
-      name: `${topPlayer.player.firstname} ${topPlayer.player.lastname}`,
-      points: topPlayer.points || '0',
-      rebounds: topPlayer.totReb || '0',
-      assists: topPlayer.assists || '0',
-    };
-    console.log(`Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
-    return topPlayerData;
-  } catch (error) {
-    console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message);
-    if (error.response?.status === 429 && retries > 0) {
-      console.log(`Rate limit hit for game ${gameId}. Retrying in 15 seconds... (${retries} retries left)`);
-      await new Promise(resolve => setTimeout(resolve, 15 * 1000));
-      return getTopPlayerStats(gameId, retries - 1);
-    }
-    return null;
   }
 }
 
@@ -110,15 +130,35 @@ async function getStandings() {
         season: new Date().getFullYear() - 1,
       },
     });
-    const standings = response.data.response;
-    const east = standings.filter(team => team.conference.name === 'east').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
-    const west = standings.filter(team => team.conference.name === 'west').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
+    const standings = response.data.response || [];
+    const east = standings.filter(team => team.conference.name === 'east')
+      .sort((a, b) => a.conference.rank - b.conference.rank)
+      .slice(0, 3);
+    const west = standings.filter(team => team.conference.name === 'west')
+      .sort((a, b) => a.conference.rank - b.conference.rank)
+      .slice(0, 3);
     console.log('East Standings Top 3:', east.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
     console.log('West Standings Top 3:', west.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
     return { east, west };
   } catch (error) {
     console.error('Error fetching standings:', error.message);
-    return { east: [], west: [] };
+    throw error; // Laissez l’appelant gérer l’erreur
+  }
+}
+
+async function getStandingsWithRetry(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await getStandings();
+    } catch (error) {
+      if (error.response?.status === 429 && i < retries - 1) {
+        console.log(`Rate limit hit in getStandings, retrying in 15s (${retries - i - 1} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, 15000));
+      } else {
+        console.error('Failed to fetch standings after retries:', error.message);
+        return { east: [], west: [] };
+      }
+    }
   }
 }
 
@@ -131,6 +171,11 @@ async function postMatchTweet(game, timestamp, client) {
     }
     const teamHashtags = `#${game.homeTeam.replace(/\s+/g, '')} #${game.awayTeam.replace(/\s+/g, '')}`;
     tweetContent += `${baseHashtags} ${teamHashtags} [${timestamp}]`;
+    console.log(`Tweet length: ${tweetContent.length}`);
+    if (tweetContent.length > 280) {
+      console.log(`Tweet too long (${tweetContent.length} chars), truncating`);
+      tweetContent = tweetContent.substring(0, 277) + '...';
+    }
     const logoPath = path.join(__dirname, 'logos', 'NBA.png');
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
     await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
@@ -141,6 +186,10 @@ async function postMatchTweet(game, timestamp, client) {
 }
 
 async function postConferenceTweet(conference, teams, timestamp, client) {
+  if (!teams || teams.length === 0) {
+    console.log(`No ${conference} standings data, skipping tweet.`);
+    return;
+  }
   try {
     const confName = conference === 'east' ? 'Eastern' : 'Western';
     let tweetContent = `${confName} Conference Top 3 - ${new Date().toDateString()}:\n`;
@@ -148,6 +197,11 @@ async function postConferenceTweet(conference, teams, timestamp, client) {
       tweetContent += `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})\n`;
     });
     tweetContent += `${baseHashtags} #${confName}Conference [${timestamp}]`;
+    console.log(`Tweet length: ${tweetContent.length}`);
+    if (tweetContent.length > 280) {
+      console.log(`Tweet too long (${tweetContent.length} chars), truncating`);
+      tweetContent = tweetContent.substring(0, 277) + '...';
+    }
     const logoPath = path.join(__dirname, 'logos', `${confName}Conference.png`);
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
     await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
@@ -164,30 +218,32 @@ async function postNBATweets() {
     accessToken: process.env.TWITTER_ACCESS_TOKEN,
     accessSecret: process.env.TWITTER_ACCESS_SECRET,
   });
+
+  let results = [];
+  let standings = { east: [], west: [] };
+
   try {
-    const results = await getNBAResults();
-    if (results.length === 0) {
-      console.log('No game results available, skipping match tweets.');
-    } else {
-      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      for (const game of results) {
-        await postMatchTweet(game, timestamp, client);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-    const standings = await getStandings();
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    await postConferenceTweet('east', standings.east, timestamp, client);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    await postConferenceTweet('west', standings.west, timestamp, client);
+    results = await getNBAResultsWithRetry();
+    standings = await getStandingsWithRetry();
   } catch (error) {
-    console.error("Error in postNBATweets:", error.message);
-    if (error.code === 429) {
-      console.log('Twitter rate limit hit. Waiting 15 minutes...');
-      await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
-      await postNBATweets();
+    console.error("Fatal error in postNBATweets:", error.message);
+    return;
+  }
+
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  if (results.length === 0) {
+    console.log('No game results available, skipping match tweets.');
+  } else {
+    for (const game of results) {
+      await postMatchTweet(game, timestamp, client);
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
+
+  await postConferenceTweet('east', standings.east, timestamp, client);
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  await postConferenceTweet('west', standings.west, timestamp, client);
+  console.log('Tweets posted');
 }
 
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
