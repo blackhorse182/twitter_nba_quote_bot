@@ -3,9 +3,26 @@ name: NBA Twitter Bot
 on:
   schedule:
     - cron: '0 0 * * *' # Daily at midnight UTC
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
+  debug-env-vars:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug environment variables
+        run: |
+          echo "TWITTER_APP_KEY is set: ${TWITTER_APP_KEY:+set}"
+          echo "TWITTER_APP_SECRET is set: ${TWITTER_APP_SECRET:+set}"
+          echo "TWITTER_ACCESS_TOKEN is set: ${TWITTER_ACCESS_TOKEN:+set}"
+          echo "TWITTER_ACCESS_SECRET is set: ${TWITTER_ACCESS_SECRET:+set}"
+          echo "Rapid_API_KEY is set: ${Rapid_API_KEY:+set}"
+        env:
+          TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
+          TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          Rapid_API_KEY: ${{ secrets.RAPID_API_KEY }}
+
   run-bot:
     runs-on: ubuntu-latest
     steps:
