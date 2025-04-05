@@ -1,16 +1,15 @@
-// Importation des modules nécessaires
-const { TwitterApi } = require('twitter-api-v2'); // API Twitter
-const schedule = require('node-schedule'); // Planification des tâches
-const express = require('express'); // Serveur web
-const axios = require('axios'); // Requêtes HTTP
-const fs = require('fs'); // Gestion des fichiers
-const path = require('path'); // Gestion des chemins de fichiers
-const sharp = require('sharp'); // Pour redimensionner les images
-require('dotenv').config({ path: '.env' }); // Chargement des variables d'environnement
+const { TwitterApi } = require('twitter-api-v2');
+const schedule = require('node-schedule');
+const express = require('express');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const sharp = require('sharp');
+require('dotenv').config({ path: '.env' });
 
-// Initialisation de l'application Express
 const app = express();
-const PORT = process.env.PORT || 10000; // Port du serveur
+const PORT = process.env.PORT || 10000;
+const baseHashtags = "#NBA #Basketball #Stats";
 
 // Hashtags de base pour les tweets
 const baseHashtags = "#NBA #Basketball #Stats";
