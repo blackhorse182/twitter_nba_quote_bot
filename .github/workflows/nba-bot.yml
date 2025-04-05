@@ -20,6 +20,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify nba-bot.js content
+        run: |
+          echo "First 20 lines of nba-bot.js:"
+          head -n 20 nba-bot.js
+
       - name: Debug environment variables
         run: |
           echo "TWITTER_APP_KEY is set: ${TWITTER_APP_KEY:+set}"
