@@ -11,13 +11,15 @@ require('dotenv').config({ path: '.env' }); // Chargement des variables d'enviro
 const app = express();
 const PORT = process.env.PORT || 10000; // Port du serveur
 
-// Configuration du client Twitter
-const client = new TwitterApi({
-  appKey: process.env.TWITTER_APP_KEY,
-  appSecret: process.env.TWITTER_APP_SECRET,
-  accessToken: process.env.TWITTER_ACCESS_TOKEN,
-  accessSecret: process.env.TWITTER_ACCESS_SECRET,
-});
+async function postNBATweets() {
+  const client = new TwitterApi({
+    appKey: process.env.TWITTER_APP_KEY,
+    appSecret: process.env.TWITTER_APP_SECRET,
+    accessToken: process.env.TWITTER_ACCESS_TOKEN,
+    accessSecret: process.env.TWITTER_ACCESS_SECRET,
+  });
+  try {
+    const results = await getNBAResults();
 
 // Hashtags de base pour les tweets
 const baseHashtags = "#NBA #Basketball #Stats";
