@@ -1,9 +1,9 @@
 name: NBA Twitter Bot
 
 on:
-  schedule:
-    - cron: '0 0 * * *' # Daily at midnight UTC
-  workflow_dispatch: {}
+ schedule:
+    - cron: '0 6 * * *' # Daily at midnight UTC
+ workflow_dispatch: {}
 
 jobs:
   debug-env-vars:
