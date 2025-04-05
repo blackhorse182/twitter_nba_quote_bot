@@ -11,21 +11,16 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const baseHashtags = "#NBA #Basketball #Stats";
 
-// Hashtags de base pour les tweets
-const baseHashtags = "#NBA #Basketball #Stats";
-
-// Fonction pour uploader un média sur Twitter avec redimensionnement
 async function uploadMedia(filePath, client) {
   try {
     const resizedImageBuffer = await sharp(filePath)
       .resize({
         width: 300,
         height: 300,
-        fit: 'contain', // Garde les proportions, ajoute du padding si nécessaire
-        background: { r: 0, g: 0, b: 0, alpha: 0 } // Fond transparent
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
       .toBuffer();
-
     const mediaId = await client.v1.uploadMedia(resizedImageBuffer, { type: 'png' });
     return mediaId;
   } catch (error) {
@@ -34,14 +29,12 @@ async function uploadMedia(filePath, client) {
   }
 }
 
-// Fonction pour récupérer les résultats des matchs NBA
 async function getNBAResults() {
   try {
     const today = new Date();
     const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1); // Date d'hier
-    const dateStr = yesterday.toISOString().split('T')[0]; // Format ISO
-
+    yesterday.setDate(today.getDate() - 1);
+    const dateStr = yesterday.toISOString().split('T')[0];
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
         'X-RapidAPI-Key': process.env.Rapid_API_KEY,
@@ -49,13 +42,11 @@ async function getNBAResults() {
       },
       params: { date: dateStr },
     });
-
     const games = response.data.response;
     if (!games || games.length === 0) {
       console.log('No games found for', dateStr);
       return [];
     }
-
     const results = games.map(game => ({
       gameId: game.id,
       date: new Date(game.date.start).toDateString(),
@@ -63,7 +54,6 @@ async function getNBAResults() {
       awayTeam: game.teams.visitors.name,
       score: `${game.scores.home.points}-${game.scores.visitors.points}`,
     }));
-
     console.log('Games retrieved:', results);
     return results;
   } catch (error) {
@@ -72,7 +62,6 @@ async function getNBAResults() {
   }
 }
 
-// Fonction pour récupérer les statistiques du meilleur joueur d'un match
 async function getTopPlayerStats(gameId, retries = 3) {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
@@ -82,24 +71,20 @@ async function getTopPlayerStats(gameId, retries = 3) {
       },
       params: { game: gameId },
     });
-
     const players = response.data.response;
     if (!players || players.length === 0) {
       console.log(`No player stats available for game ${gameId}`);
       return null;
     }
-
     const topPlayer = players.reduce((prev, curr) =>
       (parseInt(curr.points) || 0) > (parseInt(prev.points) || 0) ? curr : prev
     );
-
     const topPlayerData = {
       name: `${topPlayer.player.firstname} ${topPlayer.player.lastname}`,
       points: topPlayer.points || '0',
       rebounds: topPlayer.totReb || '0',
       assists: topPlayer.assists || '0',
     };
-
     console.log(`Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
     return topPlayerData;
   } catch (error) {
@@ -113,7 +98,6 @@ async function getTopPlayerStats(gameId, retries = 3) {
   }
 }
 
-// Fonction pour récupérer les classements des conférences
 async function getStandings() {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/standings', {
@@ -123,14 +107,12 @@ async function getStandings() {
       },
       params: {
         league: 'standard',
-        season: new Date().getFullYear() - 1, // Saison précédente
+        season: new Date().getFullYear() - 1,
       },
     });
-
     const standings = response.data.response;
     const east = standings.filter(team => team.conference.name === 'east').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
     const west = standings.filter(team => team.conference.name === 'west').sort((a, b) => a.conference.rank - b.conference.rank).slice(0, 3);
-
     console.log('East Standings Top 3:', east.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
     console.log('West Standings Top 3:', west.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
     return { east, west };
@@ -140,7 +122,6 @@ async function getStandings() {
   }
 }
 
-// Fonction pour poster un tweet sur un match
 async function postMatchTweet(game, timestamp, client) {
   try {
     let tweetContent = `${game.date}:\n${game.homeTeam} ${game.score} ${game.awayTeam}\n`;
@@ -150,10 +131,8 @@ async function postMatchTweet(game, timestamp, client) {
     }
     const teamHashtags = `#${game.homeTeam.replace(/\s+/g, '')} #${game.awayTeam.replace(/\s+/g, '')}`;
     tweetContent += `${baseHashtags} ${teamHashtags} [${timestamp}]`;
-
     const logoPath = path.join(__dirname, 'logos', 'NBA.png');
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
-
     await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
     console.log(`Match tweet posted: ${tweetContent}`);
   } catch (error) {
@@ -161,7 +140,6 @@ async function postMatchTweet(game, timestamp, client) {
   }
 }
 
-// Fonction pour poster un tweet sur les classements d'une conférence
 async function postConferenceTweet(conference, teams, timestamp, client) {
   try {
     const confName = conference === 'east' ? 'Eastern' : 'Western';
@@ -170,10 +148,8 @@ async function postConferenceTweet(conference, teams, timestamp, client) {
       tweetContent += `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})\n`;
     });
     tweetContent += `${baseHashtags} #${confName}Conference [${timestamp}]`;
-
     const logoPath = path.join(__dirname, 'logos', `${confName}Conference.png`);
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
-
     await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
     console.log(`Conference tweet posted: ${tweetContent}`);
   } catch (error) {
@@ -181,7 +157,6 @@ async function postConferenceTweet(conference, teams, timestamp, client) {
   }
 }
 
-// Fonction principale pour poster les tweets NBA
 async function postNBATweets() {
   const client = new TwitterApi({
     appKey: process.env.TWITTER_APP_KEY,
@@ -189,7 +164,6 @@ async function postNBATweets() {
     accessToken: process.env.TWITTER_ACCESS_TOKEN,
     accessSecret: process.env.TWITTER_ACCESS_SECRET,
   });
-
   try {
     const results = await getNBAResults();
     if (results.length === 0) {
@@ -198,36 +172,29 @@ async function postNBATweets() {
       const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
       for (const game of results) {
         await postMatchTweet(game, timestamp, client);
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Délai de 2s entre tweets
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
-
     const standings = await getStandings();
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await postConferenceTweet('east', standings.east, timestamp, client);
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Délai de 2s
+    await new Promise(resolve => setTimeout(resolve, 2000));
     await postConferenceTweet('west', standings.west, timestamp, client);
   } catch (error) {
     console.error("Error in postNBATweets:", error.message);
     if (error.code === 429) {
       console.log('Twitter rate limit hit. Waiting 15 minutes...');
       await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
-      await postNBATweets(); // Retry on rate limit
+      await postNBATweets();
     }
   }
 }
 
-// Planification pour exécuter la fonction tous les jours à minuit (local/Render)
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
 postNBATweets().then(() => console.log("Tweets posted"));
-
-// Route de base pour vérifier que le bot fonctionne (Render Web Service)
 app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
-
-// Lancement du serveur Express (Render Web Service or local)
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
 
-// Export pour GitHub Actions
 module.exports = { postNBATweets };
