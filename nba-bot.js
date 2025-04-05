@@ -22,6 +22,28 @@ const client = new TwitterApi({
 // Hashtags de base pour les tweets
 const baseHashtags = "#NBA #Basketball #Stats";
 
+// Fonction pour uploader un média sur Twitter avec redimensionnement
+async function uploadMedia(filePath) {
+  try {
+    // Redimensionner l'image à 300x300px (ajustez selon vos besoins)
+    const resizedImageBuffer = await sharp(filePath)
+      .resize({
+        width: 300,
+        height: 300,
+        fit: 'contain', // Garde les proportions, ajoute du padding si nécessaire
+        background: { r: 0, g: 0, b: 0, alpha: 0 } // Fond transparent
+      })
+      .toBuffer();
+
+    // Uploader l'image redimensionnée
+    const mediaId = await client.v1.uploadMedia(resizedImageBuffer, { type: 'png' });
+    return mediaId;
+  } catch (error) {
+    console.error(`Error processing or uploading media ${filePath}:`, error.message);
+    return null;
+  }
+}
+
 // Fonction pour récupérer les résultats des matchs NBA
 async function getNBAResults() {
   try {
@@ -67,7 +89,7 @@ async function getTopPlayerStats(gameId, retries = 3) {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
       headers: {
-        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+        'X-RapidAPI-Key': process.env.Rapid_API_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
       params: { game: gameId },
@@ -109,7 +131,7 @@ async function getStandings() {
   try {
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/standings', {
       headers: {
-        'X-RapidAPI-Key': process.env.RapidAPI_KEY,
+        'X-RapidAPI-Key': process.env.Rapid_API_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
       params: {
