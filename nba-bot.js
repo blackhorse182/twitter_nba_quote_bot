@@ -118,49 +118,6 @@ async function getTopPlayerStats(gameId, retries = 3) {
   }
 }
 
-async function getStandings() {
-  try {
-    const response = await axios.get('https://api-nba-v1.p.rapidapi.com/standings', {
-      headers: {
-        'X-RapidAPI-Key': process.env.Rapid_API_KEY,
-        'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
-      },
-      params: {
-        league: 'standard',
-        season: new Date().getFullYear() - 1,
-      },
-    });
-    const standings = response.data.response || [];
-    const east = standings.filter(team => team.conference.name === 'east')
-      .sort((a, b) => a.conference.rank - b.conference.rank)
-      .slice(0, 3);
-    const west = standings.filter(team => team.conference.name === 'west')
-      .sort((a, b) => a.conference.rank - b.conference.rank)
-      .slice(0, 3);
-    console.log('East Standings Top 3:', east.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
-    console.log('West Standings Top 3:', west.map(team => `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})`));
-    return { east, west };
-  } catch (error) {
-    console.error('Error fetching standings:', error.message);
-    throw error; // Laissez l’appelant gérer l’erreur
-  }
-}
-
-async function getStandingsWithRetry(retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await getStandings();
-    } catch (error) {
-      if (error.response?.status === 429 && i < retries - 1) {
-        console.log(`Rate limit hit in getStandings, retrying in 15s (${retries - i - 1} retries left)`);
-        await new Promise(resolve => setTimeout(resolve, 15000));
-      } else {
-        console.error('Failed to fetch standings after retries:', error.message);
-        return { east: [], west: [] };
-      }
-    }
-  }
-}
 
 async function postMatchTweet(game, timestamp, client) {
   try {
@@ -185,31 +142,7 @@ async function postMatchTweet(game, timestamp, client) {
   }
 }
 
-async function postConferenceTweet(conference, teams, timestamp, client) {
-  if (!teams || teams.length === 0) {
-    console.log(`No ${conference} standings data, skipping tweet.`);
-    return;
-  }
-  try {
-    const confName = conference === 'east' ? 'Eastern' : 'Western';
-    let tweetContent = `${confName} Conference Top 3 - ${new Date().toDateString()}:\n`;
-    teams.forEach(team => {
-      tweetContent += `${team.conference.rank}. ${team.team.name} (${team.win.total}-${team.loss.total})\n`;
-    });
-    tweetContent += `${baseHashtags} #${confName}Conference [${timestamp}]`;
-    console.log(`Tweet length: ${tweetContent.length}`);
-    if (tweetContent.length > 280) {
-      console.log(`Tweet too long (${tweetContent.length} chars), truncating`);
-      tweetContent = tweetContent.substring(0, 277) + '...';
-    }
-    const logoPath = path.join(__dirname, 'logos', `${confName}Conference.png`);
-    const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
-    await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
-    console.log(`Conference tweet posted: ${tweetContent}`);
-  } catch (error) {
-    console.error(`Error posting ${conference} conference tweet:`, error.message);
-  }
-}
+
 
 async function postNBATweets() {
   const client = new TwitterApi({
@@ -240,11 +173,7 @@ async function postNBATweets() {
     }
   }
 
-  await postConferenceTweet('east', standings.east, timestamp, client);
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  await postConferenceTweet('west', standings.west, timestamp, client);
-  console.log('Tweets posted');
-}
+  
 
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
 postNBATweets().then(() => console.log("Tweets posted"));
