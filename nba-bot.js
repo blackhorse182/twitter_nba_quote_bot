@@ -172,7 +172,7 @@ async function postNBATweets() {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
-
+} 
   
 
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
