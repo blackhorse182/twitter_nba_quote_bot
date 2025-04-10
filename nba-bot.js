@@ -182,4 +182,3 @@ app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
 
-module.exports = { postNBATweets };
