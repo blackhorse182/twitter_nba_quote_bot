@@ -1,68 +1,25 @@
-name: NBA Twitter Bot
-
+name: NBA Tweet Bot
 on:
- schedule:
-    - cron: '0 6 * * *' # Daily at midnight UTC
- workflow_dispatch: {}
-
+  schedule:
+    - cron: '0 6 * * *' # 6 AM daily
+  workflow_dispatch: # Manual trigger for testing
 jobs:
-  debug-env-vars:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Debug environment variables
-        run: |
-          echo "TWITTER_APP_KEY is set: ${TWITTER_APP_KEY:+set}"
-          echo "TWITTER_APP_SECRET is set: ${TWITTER_APP_SECRET:+set}"
-          echo "TWITTER_ACCESS_TOKEN is set: ${TWITTER_ACCESS_TOKEN:+set}"
-          echo "TWITTER_ACCESS_SECRET is set: ${TWITTER_ACCESS_SECRET:+set}"
-          echo "Rapid_API_KEY is set: ${Rapid_API_KEY:+set}"
-  env:
-    TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
-    TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
-    TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-    TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-    Rapid_API_KEY: ${{ secrets.RAPID_API_KEY }}
-
-  run-bot:
+  tweet:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v3
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
-
+          node-version: '18' # Match your local version
       - name: Install dependencies
         run: npm install
-
-      - name: Verify nba-bot.js content
-        run: |
-          echo "First 20 lines of nba-bot.js:"
-          head -n 20 nba-bot.js
-
-      - name: Debug environment variables
-        run: |
-          echo "TWITTER_APP_KEY is set: ${TWITTER_APP_KEY:+set}"
-          echo "TWITTER_APP_SECRET is set: ${TWITTER_APP_SECRET:+set}"
-          echo "TWITTER_ACCESS_TOKEN is set: ${TWITTER_ACCESS_TOKEN:+set}"
-          echo "TWITTER_ACCESS_SECRET is set: ${TWITTER_ACCESS_SECRET:+set}"
-          echo "Rapid_API_KEY is set: ${RAPID_API_KEY:+set}"
+      - name: Run the bot
         env:
           TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
           TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-          Rapid_API_KEY: ${{ secrets.RAPID_API_KEY }}
-
-       - name: Trigger Render Redeploy
-          if: success()
-          env:
-          RENDER_API_KEY: ${{ secrets.test }}
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
-        run: |
-    curl -X POST "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
-    -H "Authorization: Bearer ${RENDER_API_KEY}" \
-    -H "Content-Type: application/json" \
-    || echo "Failed to trigger Render redeploy"
+          RAPID_API_KEY: ${{ secrets.RAPID_API_KEY }}
+        run: node -e "require('./nba-bot').postNBATweets().then(() => { console.log('Tweets posted'); process.exit(0); }).catch(err => { console.error(err); process.exit(1); })"
