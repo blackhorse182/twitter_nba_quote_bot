@@ -190,13 +190,7 @@ async function postNBATweets() {
   }
 }
 
-// Schedule the job, run it once, define the route, and start the server
-schedule.scheduleJob('0 6 * * *', async () => await postNBATweets());
-postNBATweets().then(() => console.log("Tweets posted"));
-app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
-app.listen(PORT, () => {
-  console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
-});
+
 
 
 module.exports = { postNBATweets }; // Export it
