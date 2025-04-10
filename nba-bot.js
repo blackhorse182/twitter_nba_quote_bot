@@ -8,7 +8,7 @@ const sharp = require('sharp');
 require('dotenv').config({ path: '.env' });
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10000; // This is fine as-is
 const baseHashtags = "#NBA #Basketball #Stats";
 
 async function uploadMedia(filePath, client) {
