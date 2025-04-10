@@ -160,6 +160,7 @@ async function getStandingsWithRetry(retries = 3) {
   }
 }
 
+// Define the postNBATweets function
 async function postNBATweets() {
   const client = new TwitterApi({
     appKey: process.env.TWITTER_APP_KEY,
@@ -179,7 +180,7 @@ async function postNBATweets() {
     return;
   }
 
-const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
   if (results.length === 0) {
     console.log('No game results available, skipping match tweets.');
   } else {
@@ -188,21 +189,12 @@ const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
-} // Add this closing brace here
+}
 
+// Schedule the job, run it once, define the route, and start the server
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
 postNBATweets().then(() => console.log("Tweets posted"));
 app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
-  
-  
-
-schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
-postNBATweets().then(() => console.log("Tweets posted"));
-app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
-app.listen(PORT, () => {
-  console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
-});
-
