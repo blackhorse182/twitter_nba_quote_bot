@@ -8,7 +8,6 @@ const sharp = require('sharp');
 require('dotenv').config({ path: '.env' });
 
 const app = express();
-const PORT = process.env.PORT || 3000; // This is fine as-is
 const baseHashtags = "#NBA #Basketball #Stats";
 
 async function uploadMedia(filePath, client) {
@@ -198,3 +197,7 @@ app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
 app.listen(PORT, () => {
   console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
 });
+
+
+module.exports = { postNBATweets }; // Export it
+
