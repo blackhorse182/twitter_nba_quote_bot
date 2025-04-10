@@ -152,27 +152,7 @@ async function postNBATweets() {
     accessSecret: process.env.TWITTER_ACCESS_SECRET,
   });
 
-  let results = [];
-  let standings = { east: [], west: [] };
-
-  try {
-    results = await getNBAResultsWithRetry();
-    standings = await getStandingsWithRetry();
-  } catch (error) {
-    console.error("Fatal error in postNBATweets:", error.message);
-    return;
-  }
-
-  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  if (results.length === 0) {
-    console.log('No game results available, skipping match tweets.');
-  } else {
-    for (const game of results) {
-      await postMatchTweet(game, timestamp, client);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  }
-} 
+  
   
 
 schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
