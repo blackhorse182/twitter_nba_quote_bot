@@ -142,7 +142,23 @@ async function postMatchTweet(game, timestamp, client) {
   }
 }
 
-
+async function getStandingsWithRetry(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      // Replace with actual standings API call
+      console.log("Fetching standings (placeholder)...");
+      return { east: [], west: [] }; // Dummy data
+    } catch (error) {
+      if (error.response?.status === 429 && i < retries - 1) {
+        console.log(`Rate limit hit in getStandings, retrying in 15s (${retries - i - 1} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, 15000));
+      } else {
+        console.error('Failed to fetch standings after retries:', error.message);
+        return { east: [], west: [] };
+      }
+    }
+  }
+}
 
 async function postNBATweets() {
   const client = new TwitterApi({
@@ -152,6 +168,34 @@ async function postNBATweets() {
     accessSecret: process.env.TWITTER_ACCESS_SECRET,
   });
 
+  let results = [];
+  let standings = { east: [], west: [] };
+
+  try {
+    results = await getNBAResultsWithRetry();
+    standings = await getStandingsWithRetry();
+  } catch (error) {
+    console.error("Fatal error in postNBATweets:", error.message);
+    return;
+  }
+
+const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  if (results.length === 0) {
+    console.log('No game results available, skipping match tweets.');
+  } else {
+    for (const game of results) {
+      await postMatchTweet(game, timestamp, client);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+} // Add this closing brace here
+
+schedule.scheduleJob('0 0 * * *', async () => await postNBATweets());
+postNBATweets().then(() => console.log("Tweets posted"));
+app.get('/run', (req, res) => res.send('NBA Twitter Bot running!'));
+app.listen(PORT, () => {
+  console.log(`NBA Bot started! Posting every 24 hours. Server running on port ${PORT}`);
+});
   
   
 
