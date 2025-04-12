@@ -1,13 +1,10 @@
 const { TwitterApi } = require('twitter-api-v2');
-const schedule = require('node-schedule');
-const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 require('dotenv').config({ path: '.env' });
 
-const app = express();
 const baseHashtags = "#NBA #Basketball #Stats";
 
 async function uploadMedia(filePath, client) {
@@ -82,6 +79,7 @@ async function getNBAResultsWithRetry(retries = 3) {
 async function getTopPlayerStats(gameId, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
+      console.log(`Fetching stats for game ${gameId}, RapidAPI key status: ${process.env.RAPIDAPI_KEY ? 'Set' : 'Missing'}`);
       const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
         headers: {
           'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
@@ -106,7 +104,7 @@ async function getTopPlayerStats(gameId, retries = 3) {
       console.log(`Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
       return topPlayerData;
     } catch (error) {
-      console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message);
+      console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message, 'Data:', error.response?.data);
       if (error.response?.status === 429 && i < retries - 1) {
         console.log(`Rate limit hit for game ${gameId}. Retrying in 15 seconds... (${retries - i - 1} retries left)`);
         await new Promise(resolve => setTimeout(resolve, 15000));
@@ -117,7 +115,6 @@ async function getTopPlayerStats(gameId, retries = 3) {
     }
   }
 }
-
 
 async function postMatchTweet(game, timestamp, client) {
   try {
@@ -134,20 +131,22 @@ async function postMatchTweet(game, timestamp, client) {
       tweetContent = tweetContent.substring(0, 277) + '...';
     }
     const logoPath = path.join(__dirname, 'logos', 'NBA.png');
+    console.log(`Checking logo file: ${logoPath}, exists: ${fs.existsSync(logoPath)}`);
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
-    await client.v2.tweet({ text: tweetContent, media: { media_ids: mediaIds } });
+    const tweetPayload = { text: tweetContent, media: { media_ids: mediaIds } };
+    console.log('Tweet payload:', JSON.stringify(tweetPayload));
+    await client.v2.tweet(tweetPayload);
     console.log(`Match tweet posted: ${tweetContent}`);
   } catch (error) {
-    console.error(`Error posting match tweet for game ${game.gameId}:`, error.message);
+    console.error(`Error posting match tweet for game ${game.gameId}:`, error.message, 'Data:', error.response?.data);
   }
 }
 
 async function getStandingsWithRetry(retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      // Replace with actual standings API call
       console.log("Fetching standings (placeholder)...");
-      return { east: [], west: [] }; // Dummy data
+      return { east: [], west: [] };
     } catch (error) {
       if (error.response?.status === 429 && i < retries - 1) {
         console.log(`Rate limit hit in getStandings, retrying in 15s (${retries - i - 1} retries left)`);
@@ -160,7 +159,6 @@ async function getStandingsWithRetry(retries = 3) {
   }
 }
 
-// Define the postNBATweets function
 async function postNBATweets() {
   const client = new TwitterApi({
     appKey: process.env.TWITTER_APP_KEY,
@@ -191,8 +189,4 @@ async function postNBATweets() {
   }
 }
 
-
-
-
-module.exports = { postNBATweets }; // Export it
-
+module.exports = { postNBATweets };
