@@ -35,6 +35,7 @@ async function getNBAResults() {
     yesterday.setDate(today.getDate() - 1);
     const dateStr = yesterday.toISOString().split('T')[0];
     console.log(`Fetching games for date: ${dateStr}`);
+    console.log(`RapidAPI key status: ${process.env.RAPIDAPI_KEY ? 'Set' : 'Missing'}`);
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
         'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
@@ -57,8 +58,8 @@ async function getNBAResults() {
     console.log('Games retrieved:', results);
     return results;
   } catch (error) {
-    console.error('API Error in getNBAResults:', error.message);
-    throw error; // Laissez l’appelant gérer l’erreur (pour les nouvelles tentatives)
+    console.error('API Error in getNBAResults:', error.message, 'Status:', error.response?.status, 'Data:', error.response?.data);
+    throw error;
   }
 }
 
