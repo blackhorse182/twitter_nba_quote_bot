@@ -37,7 +37,7 @@ async function getNBAResults() {
     console.log(`Fetching games for date: ${dateStr}`);
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
-        'X-RapidAPI-Key': process.env.RAPID_API_KEY,
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
       },
       params: { date: dateStr },
@@ -83,7 +83,7 @@ async function getTopPlayerStats(gameId, retries = 3) {
     try {
       const response = await axios.get('https://api-nba-v1.p.rapidapi.com/players/statistics', {
         headers: {
-          'X-RapidAPI-Key': process.env.RAPID_API_KEY,
+          'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
           'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
         },
         params: { game: gameId },
