@@ -152,6 +152,19 @@ async function postMatchTweet(game, timestamp, client) {
 
 
 async function postNBATweets() {
+  const requiredEnvVars = [
+    'RAPIDAPI_KEY',
+    'TWITTER_APP_KEY',
+    'TWITTER_APP_SECRET',
+    'TWITTER_ACCESS_TOKEN',
+    'TWITTER_ACCESS_SECRET',
+  ];
+  const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+  if (missingVars.length > 0) {
+    console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    throw new Error('Environment configuration incomplete');
+  }
+
   const client = new TwitterApi({
     appKey: process.env.TWITTER_APP_KEY,
     appSecret: process.env.TWITTER_APP_SECRET,
@@ -160,21 +173,23 @@ async function postNBATweets() {
   });
 
   let results = [];
-  
   try {
     results = await getNBAResultsWithRetry();
-    } catch (error) {
-    console.error("Fatal error in postNBATweets:", error.message);
-    return;
+  } catch (error) {
+    console.error('Fatal error in postNBATweets:', error.message);
+    throw error; // Rethrow to ensure the process exits with an error
   }
 
   const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
   if (results.length === 0) {
-    console.log('No game results available, skipping match tweets.');
+    console.log('No game results available, posting fallback tweet.');
+    const fallbackTweet = `No NBA game results available for today. Stay tuned for more updates! ${baseHashtags} [${timestamp}]`;
+    await client.v2.tweet({ text: fallbackTweet });
+    console.log('Fallback tweet posted:', fallbackTweet);
   } else {
     for (const game of results) {
       await postMatchTweet(game, timestamp, client);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
 }
