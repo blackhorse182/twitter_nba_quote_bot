@@ -252,6 +252,9 @@ async function testMediaUpload() {
   console.log('Media ID:', mediaId);
 }
 
+// ... (full script from previous response, including all functions)
+
+// Add at the bottom of nba-bot.js
 if (require.main === module) {
   postNBATweets().then(() => {
     console.log('Tweets posted');
