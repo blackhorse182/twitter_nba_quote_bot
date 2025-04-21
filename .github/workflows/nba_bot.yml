@@ -15,7 +15,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20' # Updated to Node.js 20
           cache: 'npm'
 
       - name: Install dependencies
@@ -53,23 +53,23 @@ jobs:
           echo "console.log('Test script running');" > test.js
           node test.js || echo "Test script failed with exit code $?"
 
-          - name: Run NBA Tweet Bot
-          env:
-            TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
-            TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
-            TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-            TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-            RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-          run: |
-            echo "Checking for nba-bot.js..."
-            if [ -f nba-bot.js ]; then
-              echo "nba-bot.js found, running script..."
-              node nba-bot.js
-              echo "Script exit code: $?"
-            else
-              echo "Error: nba-bot.js not found"
-              exit 1
-            fi
+      - name: Run NBA Tweet Bot
+        env:
+          TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
+          TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        run: |
+          echo "Checking for nba-bot.js..."
+          if [ -f nba-bot.js ]; then
+            echo "nba-bot.js found, running script..."
+            set -x
+            node nba-bot.js || echo "Script failed with exit code $?"
+          else
+            echo "Error: nba-bot.js not found"
+            exit 1
+          fi
 
       - name: Notify on failure
         if: failure()
@@ -83,5 +83,3 @@ jobs:
           else
             echo "SLACK_WEBHOOK_URL not set, skipping notification"
           fi
-
-          \\
