@@ -3,7 +3,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
-require('dotenv').config({ path: '.env' });
+
 
 const baseHashtags = "#NBA #Basketball #Stats";
 
