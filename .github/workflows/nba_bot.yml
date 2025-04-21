@@ -70,7 +70,7 @@ jobs:
               echo "Error: nba-bot.js not found"
               exit 1
             fi
-            
+
       - name: Notify on failure
         if: failure()
         env:
