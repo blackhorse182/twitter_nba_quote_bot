@@ -53,31 +53,24 @@ jobs:
           echo "console.log('Test script running');" > test.js
           node test.js || echo "Test script failed with exit code $?"
 
-      - name: Run NBA Tweet Bot
-        env:
-          NODE_ENV: production
-          TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
-          TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        run: |
-          echo "Attempting to run nba-bot.js..."
-          if [ -f nba-bot.js ]; then
-            node nba-bot.js
-            echo "Script exit code: $?"
-          else
-            echo "Error: nba-bot.js not found"
-            exit 1
-          fi
-          echo "Alternative execution attempt:"
-          if [ -f nba-bot.js ]; then
-            node -e "try { require('./nba-bot').postNBATweets().catch(e => { console.error('Error:', e.message); process.exit(1); }); } catch (e) { console.error('Load error:', e.message); process.exit(1); }" || echo "Alternative execution failed with exit code $?"
-            echo "Alternative exit code: $?"
-          else
-            echo "Error: nba-bot.js not found for alternative execution"
-          fi
-
+          - name: Run NBA Tweet Bot
+          env:
+            TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
+            TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
+            TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+            TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+            RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          run: |
+            echo "Checking for nba-bot.js..."
+            if [ -f nba-bot.js ]; then
+              echo "nba-bot.js found, running script..."
+              node nba-bot.js
+              echo "Script exit code: $?"
+            else
+              echo "Error: nba-bot.js not found"
+              exit 1
+            fi
+            
       - name: Notify on failure
         if: failure()
         env:
