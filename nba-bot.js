@@ -1,9 +1,13 @@
-console.log('nba-bot.js: Script started');
+console.log('nba-bot.js: Script is about to start');
 
 try {
+  console.log('nba-bot.js: Script started');
   const { TwitterApi } = require('twitter-api-v2');
   const axios = require('axios');
   console.log('nba-bot.js: Dependencies loaded');
+
+
+// Dependencies already imported above, removing redundant try block
 
   async function postNBATweets() {
     console.log('postNBATweets: Starting...');
