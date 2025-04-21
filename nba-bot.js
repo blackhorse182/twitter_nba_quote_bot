@@ -142,22 +142,6 @@ async function postMatchTweet(game, timestamp, client) {
   }
 }
 
-async function getStandingsWithRetry(retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      console.log("Fetching standings (placeholder)...");
-      return { east: [], west: [] };
-    } catch (error) {
-      if (error.response?.status === 429 && i < retries - 1) {
-        console.log(`Rate limit hit in getStandings, retrying in 15s (${retries - i - 1} retries left)`);
-        await new Promise(resolve => setTimeout(resolve, 15000));
-      } else {
-        console.error('Failed to fetch standings after retries:', error.message);
-        return { east: [], west: [] };
-      }
-    }
-  }
-}
 
 async function postNBATweets() {
   const client = new TwitterApi({
@@ -168,12 +152,10 @@ async function postNBATweets() {
   });
 
   let results = [];
-  let standings = { east: [], west: [] };
-
+  
   try {
     results = await getNBAResultsWithRetry();
-    standings = await getStandingsWithRetry();
-  } catch (error) {
+    } catch (error) {
     console.error("Fatal error in postNBATweets:", error.message);
     return;
   }
