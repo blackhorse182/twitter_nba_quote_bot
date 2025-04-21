@@ -171,4 +171,19 @@ async function postNBATweets() {
   }
 }
 
-module.exports = { postNBATweets };
+async function testTwitterClient() {
+  const client = new TwitterApi({
+    appKey: process.env.TWITTER_APP_KEY,
+    appSecret: process.env.TWITTER_APP_SECRET,
+    accessToken: process.env.TWITTER_ACCESS_TOKEN,
+    accessSecret: process.env.TWITTER_ACCESS_SECRET,
+  });
+  try {
+    await client.v2.tweet({ text: `Test tweet from nba-bot ${new Date().toISOString()} ${baseHashtags}` });
+    console.log('Test tweet posted successfully');
+  } catch (error) {
+    console.error('Error posting test tweet:', error.message, 'Data:', error.response?.data);
+  }
+}
+
+module.exports = { postNBATweets, testTwitterClient };
