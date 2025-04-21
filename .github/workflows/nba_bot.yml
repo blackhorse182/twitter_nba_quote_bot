@@ -29,6 +29,8 @@ jobs:
           node --version
           echo "NPM version:"
           npm --version
+          echo "Commit hash:"
+          git rev-parse HEAD
           echo "Repository files:"
           ls -R
           echo "Script existence check:"
@@ -42,12 +44,12 @@ jobs:
           echo "TWITTER_ACCESS_SECRET: ${TWITTER_ACCESS_SECRET:0:4}..."
           echo "RAPIDAPI_KEY: ${RAPIDAPI_KEY:0:4}..."
           echo "Node modules:"
-          ls -l node_modules | head -n 10
+          ls -l node_modules | head -n 20
           echo "Test Node.js execution:"
           node -e "console.log('Node.js is working')"
           echo "Test minimal script execution:"
           echo "console.log('Test script running');" > test.js
-          node test.js
+          node test.js || echo "Test script failed"
           echo "Package.json content:"
           cat package.json || echo "package.json not found"
 
@@ -61,11 +63,19 @@ jobs:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
           echo "Attempting to run nba-bot.js..."
-          [ -f nba-bot.js ] && node nba-bot.js || echo "nba-bot.js not found"
-          echo "Script exit code: $?"
+          if [ -f nba-bot.js ]; then
+            node nba-bot.js
+            echo "Script exit code: $?"
+          else
+            echo "Error: nba-bot.js not found"
+          fi
           echo "Alternative execution attempt:"
-          node -e "try { require('./nba-bot').postNBATweets(); } catch (e) { console.error('Error:', e.message); process.exit(1); }" || echo "Alternative execution failed"
-          echo "Alternative exit code: $?"
+          if [ -f nba-bot.js ]; then
+            node -e "try { require('./nba-bot').postNBATweets().catch(e => { console.error('Error:', e.message); process.exit(1); }); } catch (e) { console.error('Load error:', e.message); process.exit(1); }" || echo "Alternative execution failed"
+            echo "Alternative exit code: $?"
+          else
+            echo "Error: nba-bot.js not found for alternative execution"
+          fi
 
       - name: Notify on failure
         if: failure()
