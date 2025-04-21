@@ -211,4 +211,15 @@ async function testTwitterClient() {
   }
 }
 
-module.exports = { postNBATweets, testTwitterClient };
+
+if (require.main === module) {
+  postNBATweets().then(() => {
+    console.log('Tweets posted');
+    process.exit(0);
+  }).catch((err) => {
+    console.error('Error:', err.message, err.stack);
+    process.exit(1);
+  });
+}
+
+module.exports = { postNBATweets, testTwitterClient, testMediaUpload };

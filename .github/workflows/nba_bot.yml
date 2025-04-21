@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Debug environment variables (shows if secrets are set, masks values)
+      # Debug environment variables and files
       - name: Debug environment
         run: |
           echo "Checking environment variables..."
@@ -36,6 +36,8 @@ jobs:
           echo "TWITTER_ACCESS_SECRET: ${TWITTER_ACCESS_SECRET:0:4}... (masked)"
           echo "Node modules installed:"
           ls -l node_modules | head -n 10
+          echo "Repository files:"
+          ls -R
 
       # Run the NBA bot
       - name: Run NBA Tweet Bot
@@ -48,3 +50,17 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: |
           node -e "require('./nba-bot').postNBATweets().then(() => { console.log('Tweets posted'); process.exit(0); }).catch(err => { console.error('Error:', err.message, err.stack); process.exit(1); })"
+
+      # Optional: Notify on failure (e.g., via Slack, if configured)
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\": \"NBA Bot workflow failed in ${{ github.repository }}. Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              $SLACK_WEBHOOK_URL
+          else
+            echo "SLACK_WEBHOOK_URL not set, skipping notification"
+          fi
