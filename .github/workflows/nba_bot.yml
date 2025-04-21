@@ -1,6 +1,5 @@
 name: NBA Bot
 
-# Trigger the workflow daily at 12:00 UTC or manually via workflow_dispatch
 on:
   schedule:
     - cron: '0 12 * * *'
@@ -9,52 +8,63 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-
     steps:
-      # Check out the repository code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm' # Cache dependencies based on package-lock.json
+          cache: 'npm'
 
-      # Install dependencies
       - name: Install dependencies
         run: npm install --verbose
 
-      # Debug environment variables and files
       - name: Debug environment
         run: |
-          echo "Checking environment variables..."
-          echo "RAPIDAPI_KEY: ${RAPIDAPI_KEY:0:4}... (masked)"
-          echo "TWITTER_APP_KEY: ${TWITTER_APP_KEY:0:4}... (masked)"
-          echo "TWITTER_APP_SECRET: ${TWITTER_APP_SECRET:0:4}... (masked)"
-          echo "TWITTER_ACCESS_TOKEN: ${TWITTER_ACCESS_TOKEN:0:4}... (masked)"
-          echo "TWITTER_ACCESS_SECRET: ${TWITTER_ACCESS_SECRET:0:4}... (masked)"
-          echo "Node modules installed:"
-          ls -l node_modules | head -n 10
+          echo "Node version:"
+          node --version
+          echo "NPM version:"
+          npm --version
           echo "Repository files:"
           ls -R
-          echo "Script content:"
-          cat nba-bot.js | head -n 20
-          echo "Test Node.js:"
+          echo "Script content (nba-bot.js):"
+          cat nba-bot.js || echo "nba-bot.js not found"
+          echo "Environment variables (masked):"
+          echo "TWITTER_APP_KEY: ${TWITTER_APP_KEY:0:4}..."
+          echo "TWITTER_APP_SECRET: ${TWITTER_APP_SECRET:0:4}..."
+          echo "TWITTER_ACCESS_TOKEN: ${TWITTER_ACCESS_TOKEN:0:4}..."
+          echo "TWITTER_ACCESS_SECRET: ${TWITTER_ACCESS_SECRET:0:4}..."
+          echo "RAPIDAPI_KEY: ${RAPIDAPI_KEY:0:4}..."
+          echo "Node modules:"
+          ls -l node_modules | head -n 10
+          echo "Test Node.js execution:"
           node -e "console.log('Node.js is working')"
+          echo "Test script existence:"
+          [ -f nba-bot.js ] && echo "nba-bot.js exists" || echo "nba-bot.js missing"
 
-      # Run the NBA bot
       - name: Run NBA Tweet Bot
         env:
           NODE_ENV: production
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
           TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
           TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
-          node nba-bot.js
-          echo "Exit code: $?"
+          node nba-bot.js || echo "Script failed with exit code $?"
+          echo "Script exit code: $?"
 
-      
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\": \"NBA Bot failed in ${{ github.repository }}. Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              $SLACK_WEBHOOK_URL
+          else
+            echo "SLACK_WEBHOOK_URL not set, skipping notification"
+          fi
