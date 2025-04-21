@@ -3,7 +3,7 @@ name: NBA Bot
 # Trigger the workflow daily at 12:00 UTC or manually via workflow_dispatch
 on:
   schedule:
-    - cron: '0 12 * * *'
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
 
       # Install dependencies
       - name: Install dependencies
-        run: npm install
+        run: npm install --verbose
 
       # Debug environment variables and files
       - name: Debug environment
@@ -41,6 +41,8 @@ jobs:
           ls -R
           echo "Script content:"
           cat nba-bot.js | head -n 20
+          echo "Test Node.js:"
+          node -e "console.log('Node.js is working')"
 
       # Run the NBA bot
       - name: Run NBA Tweet Bot
@@ -53,6 +55,7 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: |
           node nba-bot.js
+          echo "Exit code: $?"
 
       # Notify on failure (optional, requires SLACK_WEBHOOK_URL secret)
       - name: Notify on failure
@@ -62,8 +65,3 @@ jobs:
         run: |
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
             curl -X POST -H 'Content-type: application/json' \
-              --data "{\"text\": \"NBA Bot workflow failed in ${{ github.repository }}. Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
-              $SLACK_WEBHOOK_URL
-          else
-            echo "SLACK_WEBHOOK_URL not set, skipping notification"
-          fi
