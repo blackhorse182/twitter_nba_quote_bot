@@ -41,21 +41,29 @@ async function getNBAResults() {
       params: { date: dateStr },
     });
     const games = response.data.response || [];
+    console.log(`API response: ${games.length} games found for ${dateStr}`);
     if (!games || games.length === 0) {
       console.log('No games found for', dateStr);
       return [];
     }
-    const results = games.map(game => ({
+    const results = games.map((game) => ({
       gameId: game.id,
       date: new Date(game.date.start).toDateString(),
       homeTeam: game.teams.home.name,
       awayTeam: game.teams.visitors.name,
       score: `${game.scores.home.points}-${game.scores.visitors.points}`,
     }));
-    console.log('Games retrieved:', results);
+    console.log('Games retrieved:', JSON.stringify(results, null, 2));
     return results;
   } catch (error) {
-    console.error('API Error in getNBAResults:', error.message, 'Status:', error.response?.status, 'Data:', error.response?.data);
+    console.error(
+      'API Error in getNBAResults:',
+      error.message,
+      'Status:',
+      error.response?.status,
+      'Data:',
+      JSON.stringify(error.response?.data, null, 2)
+    );
     throw error;
   }
 }
