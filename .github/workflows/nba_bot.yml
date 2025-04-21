@@ -23,14 +23,18 @@ jobs:
 
       - name: Debug environment
         run: |
+          echo "Current directory:"
+          pwd
           echo "Node version:"
           node --version
           echo "NPM version:"
           npm --version
           echo "Repository files:"
           ls -R
+          echo "Script existence check:"
+          [ -f nba-bot.js ] && echo "nba-bot.js exists" || echo "nba-bot.js missing"
           echo "Script content (nba-bot.js):"
-          cat nba-bot.js || echo "nba-bot.js not found"
+          cat nba-bot.js || echo "Failed to read nba-bot.js"
           echo "Environment variables (masked):"
           echo "TWITTER_APP_KEY: ${TWITTER_APP_KEY:0:4}..."
           echo "TWITTER_APP_SECRET: ${TWITTER_APP_SECRET:0:4}..."
@@ -41,8 +45,11 @@ jobs:
           ls -l node_modules | head -n 10
           echo "Test Node.js execution:"
           node -e "console.log('Node.js is working')"
-          echo "Test script existence:"
-          [ -f nba-bot.js ] && echo "nba-bot.js exists" || echo "nba-bot.js missing"
+          echo "Test minimal script execution:"
+          echo "console.log('Test script running');" > test.js
+          node test.js
+          echo "Package.json content:"
+          cat package.json || echo "package.json not found"
 
       - name: Run NBA Tweet Bot
         env:
@@ -53,8 +60,12 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
-          node nba-bot.js || echo "Script failed with exit code $?"
+          echo "Attempting to run nba-bot.js..."
+          [ -f nba-bot.js ] && node nba-bot.js || echo "nba-bot.js not found"
           echo "Script exit code: $?"
+          echo "Alternative execution attempt:"
+          node -e "try { require('./nba-bot').postNBATweets(); } catch (e) { console.error('Error:', e.message); process.exit(1); }" || echo "Alternative execution failed"
+          echo "Alternative exit code: $?"
 
       - name: Notify on failure
         if: failure()
