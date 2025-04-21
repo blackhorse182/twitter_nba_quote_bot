@@ -1,10 +1,10 @@
 console.log('nba-bot.js: Script loaded');
 
 try {
+  console.log('nba-bot.js: Attempting to load dependencies');
   const { TwitterApi } = require('twitter-api-v2');
   const axios = require('axios');
-
-  console.log('nba-bot.js: Dependencies loaded');
+  console.log('nba-bot.js: Dependencies loaded successfully');
 
   async function postNBATweets() {
     console.log('postNBATweets: Starting...');
@@ -15,45 +15,7 @@ try {
       TWITTER_ACCESS_SECRET: process.env.TWITTER_ACCESS_SECRET ? 'Set' : 'Missing',
       RAPIDAPI_KEY: process.env.RAPIDAPI_KEY ? 'Set' : 'Missing',
     });
-
-    try {
-      const client = new TwitterApi({
-        appKey: process.env.TWITTER_APP_KEY,
-        appSecret: process.env.TWITTER_APP_SECRET,
-        accessToken: process.env.TWITTER_ACCESS_TOKEN,
-        accessSecret: process.env.TWITTER_ACCESS_SECRET,
-      });
-      console.log('postNBATweets: Twitter client initialized');
-
-      // Test API call
-      console.log('postNBATweets: Fetching NBA results...');
-      const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
-        headers: {
-          'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'api-nba-v1.p.rapidapi.com',
-        },
-        params: { date: '2025-04-20' },
-      });
-      const games = response.data.response || [];
-      console.log('postNBATweets: Games retrieved:', games.length);
-
-      const timestamp = new Date().toISOString();
-      if (games.length === 0) {
-        console.log('postNBATweets: No games, posting fallback tweet');
-        await client.v2.tweet({ text: `No NBA games on ${timestamp}` });
-      } else {
-        for (const game of games) {
-          console.log('postNBATweets: Posting tweet for game:', game);
-          await client.v2.tweet({
-            text: `Game on ${timestamp}: ${game.teams?.home?.name || 'Unknown'} vs ${game.teams?.visitors?.name || 'Unknown'}`,
-          });
-        }
-      }
-      console.log('postNBATweets: Completed');
-    } catch (error) {
-      console.error('postNBATweets: Error:', error.message, error.stack);
-      throw error;
-    }
+    console.log('postNBATweets: Function defined, but not executing complex logic');
   }
 
   if (require.main === module) {
@@ -71,6 +33,6 @@ try {
 
   module.exports = { postNBATweets };
 } catch (error) {
-  console.error('nba-bot.js: Failed to load script:', error.message, error.stack);
+  console.error('nba-bot.js: Failed to load script:', error.message, err.stack);
   process.exit(1);
 }
