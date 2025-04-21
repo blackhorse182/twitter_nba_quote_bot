@@ -7,7 +7,7 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: '.env' });
 }
 
-const baseHashtags = "#NBA #Basketball #Stats";
+const baseHashtags = '#NBA #Basketball #Stats';
 
 async function uploadMedia(filePath, client) {
   try {
@@ -75,12 +75,16 @@ async function getNBAResultsWithRetry(retries = 3) {
     try {
       return await getNBAResults();
     } catch (error) {
-      if (error.response?.status === 429 && i < retries - 1) {
+      const status = error.response?.status;
+      if (status === 429 && i < retries - 1) {
         console.log(`Rate limit hit in getNBAResults, retrying in 15s (${retries - i - 1} retries left)`);
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        await new Promise((resolve) => setTimeout(resolve, 15000));
+      } else if (status === 401) {
+        console.error('Invalid RapidAPI key. Please check RAPIDAPI_KEY in environment variables.');
+        throw new Error('Authentication failed: Invalid RapidAPI key');
       } else {
-        console.error('Failed to fetch game results after retries:', error.message);
-        return [];
+        console.error(`Failed to fetch game results after retries: ${error.message}`);
+        throw error;
       }
     }
   }
@@ -111,13 +115,20 @@ async function getTopPlayerStats(gameId, retries = 3) {
         rebounds: topPlayer.totReb || '0',
         assists: topPlayer.assists || '0',
       };
-      console.log(`Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`);
+      console.log(
+        `Top player for game ${gameId} (${topPlayer.team.name}): ${topPlayerData.name} - ${topPlayerData.points} pts, ${topPlayerData.rebounds} reb, ${topPlayerData.assists} ast`
+      );
       return topPlayerData;
     } catch (error) {
-      console.error(`Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`, error.message, 'Data:', error.response?.data);
+      console.error(
+        `Error fetching player stats for game ${gameId}: ${error.response?.status || 'Unknown'}`,
+        error.message,
+        'Data:',
+        JSON.stringify(error.response?.data, null, 2)
+      );
       if (error.response?.status === 429 && i < retries - 1) {
         console.log(`Rate limit hit for game ${gameId}. Retrying in 15 seconds... (${retries - i - 1} retries left)`);
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        await new Promise((resolve) => setTimeout(resolve, 15000));
       } else {
         console.error('Failed to fetch player stats after retries:', error.message);
         return null;
@@ -143,56 +154,74 @@ async function postMatchTweet(game, timestamp, client) {
     const logoPath = path.join(__dirname, 'logos', 'NBA.png');
     console.log(`Checking logo file: ${logoPath}, exists: ${fs.existsSync(logoPath)}`);
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
-    const tweetPayload = { text: tweetContent, media: { media_ids: mediaIds } };
+    const tweetPayload = { text: tweetContent, media: { media_ids: mediaIds.filter((id) => id) } };
     console.log('Tweet payload:', JSON.stringify(tweetPayload));
     await client.v2.tweet(tweetPayload);
     console.log(`Match tweet posted: ${tweetContent}`);
   } catch (error) {
-    console.error(`Error posting match tweet for game ${game.gameId}:`, error.message, 'Data:', error.response?.data);
+    console.error(
+      `Error posting match tweet for game ${game.gameId}:`,
+      error.message,
+      'Data:',
+      JSON.stringify(error.response?.data, null, 2)
+    );
   }
 }
 
-
 async function postNBATweets() {
-  const requiredEnvVars = [
-    'RAPIDAPI_KEY',
-    'TWITTER_APP_KEY',
-    'TWITTER_APP_SECRET',
-    'TWITTER_ACCESS_TOKEN',
-    'TWITTER_ACCESS_SECRET',
-  ];
-  const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
-  if (missingVars.length > 0) {
-    console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
-    throw new Error('Environment configuration incomplete');
-  }
-
-  const client = new TwitterApi({
-    appKey: process.env.TWITTER_APP_KEY,
-    appSecret: process.env.TWITTER_APP_SECRET,
-    accessToken: process.env.TWITTER_ACCESS_TOKEN,
-    accessSecret: process.env.TWITTER_ACCESS_SECRET,
-  });
-
-  let results = [];
   try {
-    results = await getNBAResultsWithRetry();
-  } catch (error) {
-    console.error('Fatal error in postNBATweets:', error.message);
-    throw error; // Rethrow to ensure the process exits with an error
-  }
+    console.log('Starting postNBATweets...');
+    console.log('Environment variables:', {
+      RAPIDAPI_KEY: process.env.RAPIDAPI_KEY ? 'Set' : 'Missing',
+      TWITTER_APP_KEY: process.env.TWITTER_APP_KEY ? 'Set' : 'Missing',
+      TWITTER_APP_SECRET: process.env.TWITTER_APP_SECRET ? 'Set' : 'Missing',
+      TWITTER_ACCESS_TOKEN: process.env.TWITTER_ACCESS_TOKEN ? 'Set' : 'Missing',
+      TWITTER_ACCESS_SECRET: process.env.TWITTER_ACCESS_SECRET ? 'Set' : 'Missing',
+    });
 
-  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  if (results.length === 0) {
-    console.log('No game results available, posting fallback tweet.');
-    const fallbackTweet = `No NBA game results available for today. Stay tuned for more updates! ${baseHashtags} [${timestamp}]`;
-    await client.v2.tweet({ text: fallbackTweet });
-    console.log('Fallback tweet posted:', fallbackTweet);
-  } else {
-    for (const game of results) {
-      await postMatchTweet(game, timestamp, client);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    const requiredEnvVars = [
+      'RAPIDAPI_KEY',
+      'TWITTER_APP_KEY',
+      'TWITTER_APP_SECRET',
+      'TWITTER_ACCESS_TOKEN',
+      'TWITTER_ACCESS_SECRET',
+    ];
+    const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+    if (missingVars.length > 0) {
+      console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
+      throw new Error('Environment configuration incomplete');
     }
+
+    const client = new TwitterApi({
+      appKey: process.env.TWITTER_APP_KEY,
+      appSecret: process.env.TWITTER_APP_SECRET,
+      accessToken: process.env.TWITTER_ACCESS_TOKEN,
+      accessSecret: process.env.TWITTER_ACCESS_SECRET,
+    });
+
+    let results = [];
+    try {
+      results = await getNBAResultsWithRetry();
+    } catch (error) {
+      console.error('Fatal error in postNBATweets:', error.message);
+      throw error;
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    if (results.length === 0) {
+      console.log('No game results available, posting fallback tweet.');
+      const fallbackTweet = `No NBA game results available for today. Stay tuned for more updates! ${baseHashtags} [${timestamp}]`;
+      await client.v2.tweet({ text: fallbackTweet });
+      console.log('Fallback tweet posted:', fallbackTweet);
+    } else {
+      for (const game of results) {
+        await postMatchTweet(game, timestamp, client);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+  } catch (error) {
+    console.error('Unexpected error in postNBATweets:', error.message, error.stack);
+    throw error;
   }
 }
 
@@ -207,10 +236,21 @@ async function testTwitterClient() {
     await client.v2.tweet({ text: `Test tweet from nba-bot ${new Date().toISOString()} ${baseHashtags}` });
     console.log('Test tweet posted successfully');
   } catch (error) {
-    console.error('Error posting test tweet:', error.message, 'Data:', error.response?.data);
+    console.error('Error posting test tweet:', error.message, 'Data:', JSON.stringify(error.response?.data, null, 2));
   }
 }
 
+async function testMediaUpload() {
+  const client = new TwitterApi({
+    appKey: process.env.TWITTER_APP_KEY,
+    appSecret: process.env.TWITTER_APP_SECRET,
+    accessToken: process.env.TWITTER_ACCESS_TOKEN,
+    accessSecret: process.env.TWITTER_ACCESS_SECRET,
+  });
+  const logoPath = path.join(__dirname, 'logos', 'NBA.png');
+  const mediaId = await uploadMedia(logoPath, client);
+  console.log('Media ID:', mediaId);
+}
 
 if (require.main === module) {
   postNBATweets().then(() => {
