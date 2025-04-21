@@ -252,14 +252,14 @@ async function testMediaUpload() {
   console.log('Media ID:', mediaId);
 }
 
+
 if (require.main === module) {
   postNBATweets().then(() => {
-    console.log('Tweets posted');
+    console.log('Tweets posted successfully');
     process.exit(0);
   }).catch((err) => {
-    console.error('Error:', err.message, err.stack);
+    console.error('Error:', err.message);
     process.exit(1);
   });
 }
-
 module.exports = { postNBATweets, testTwitterClient, testMediaUpload };
