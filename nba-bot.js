@@ -11,21 +11,21 @@ try {
       TWITTER_APP_KEY: process.env.TWITTER_APP_KEY ? 'Set' : 'Missing',
       RAPIDAPI_KEY: process.env.RAPIDAPI_KEY ? 'Set' : 'Missing',
     });
-    // Add your tweet-posting or API logic here
-    console.log('postNBATweets: Completed');
+    // Replace this with your actual tweeting logic
+    console.log('postNBATweets: Simulated tweet posted');
   }
 
-  // Run this block only when the script is executed directly
+  // Run the function when the script is executed directly
   if (require.main === module) {
     console.log('nba-bot.js: Executing main block');
     postNBATweets()
       .then(() => console.log('nba-bot.js: Script completed successfully'))
       .catch((err) => {
         console.error('nba-bot.js: Error:', err.message);
-        process.exit(1); // Exit with failure code
+        process.exit(1);
       });
   }
 } catch (error) {
   console.error('nba-bot.js: Failed to load script:', error.message);
-  process.exit(1); // Exit with failure code
+  process.exit(1);
 }
