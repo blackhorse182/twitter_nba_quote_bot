@@ -3,7 +3,9 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
-
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: '.env' });
+}
 
 const baseHashtags = "#NBA #Basketball #Stats";
 
