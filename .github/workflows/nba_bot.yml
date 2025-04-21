@@ -3,7 +3,7 @@ name: NBA Bot
 # Trigger the workflow daily at 12:00 UTC or manually via workflow_dispatch
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,13 +13,13 @@ jobs:
     steps:
       # Check out the repository code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Set up Node.js environment
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '18'
           cache: 'npm' # Cache dependencies based on package-lock.json
 
       # Install dependencies
