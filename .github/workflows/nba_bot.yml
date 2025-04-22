@@ -2,7 +2,7 @@ name: NBA Tweet Bot
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # Runs daily at 12:00 UTC
+    - cron: '0 6 * * *'  # Runs daily at 12:00 UTC
   workflow_dispatch:      # Allows manual triggering
 
 jobs:
