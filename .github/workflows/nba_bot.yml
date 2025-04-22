@@ -2,7 +2,7 @@ name: NBA Tweet Bot
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Runs daily at 12:00 UTC
+    - cron: '0 12 * * *'  # Runs daily at 12:00 UTC
   workflow_dispatch:      # Allows manual triggering
 
 jobs:
@@ -19,7 +19,14 @@ jobs:
           cache: 'npm'        # Cache npm dependencies
 
       - name: Install dependencies
-        run: npm ci  # Use npm ci for cleaner installs
+        run: |
+          echo "Attempting npm ci..."
+          npm ci || {
+            echo "npm ci failed, falling back to npm install..."
+            rm -f package-lock.json
+            npm install
+            echo "npm install completed, regenerating package-lock.json"
+          }
         continue-on-error: false  # Fail if dependencies can't be installed
 
       - name: Debug environment
