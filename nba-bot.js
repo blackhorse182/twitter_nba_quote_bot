@@ -40,6 +40,7 @@ async function getNBAResults() {
       },
       params: { date: dateStr },
     });
+    console.log('API Response:', response.data);
     const games = response.data.response || [];
     if (!games || games.length === 0) {
       console.log('No games found for', dateStr);
@@ -135,7 +136,9 @@ async function postMatchTweet(game, timestamp, client) {
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
     const tweetPayload = { text: tweetContent, media: { media_ids: mediaIds } };
     console.log('Tweet payload:', JSON.stringify(tweetPayload));
+    console.log('Tweet payload:', tweetPayload);
     await client.v2.tweet(tweetPayload);
+    console.log('Tweet posted successfully.');
     console.log(`Match tweet posted: ${tweetContent}`);
   } catch (error) {
     console.error(`Error posting match tweet for game ${game.gameId}:`, error.message, 'Data:', error.response?.data);
@@ -145,6 +148,7 @@ async function postMatchTweet(game, timestamp, client) {
 
 
 async function postNBATweets() {
+  console.log('Starting NBA Tweet Bot...');
   const client = new TwitterApi({
     appKey: process.env.TWITTER_APP_KEY,
     appSecret: process.env.TWITTER_APP_SECRET,
@@ -155,6 +159,7 @@ async function postNBATweets() {
   let results = [];
 
   try {
+    console.log('Fetching NBA results...');
     results = await getNBAResultsWithRetry();
   } catch (error) {
     console.error("Fatal error in postNBATweets:", error.message);
@@ -163,13 +168,24 @@ async function postNBATweets() {
 
   const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
   if (results.length === 0) {
+    console.log('No NBA games found. Exiting...');
+    return;
+  }
+  if (results.length === 0) {
     console.log('No game results available, skipping match tweets.');
   } else {
     for (const game of results) {
+      console.log('Posting tweet...');
       await postMatchTweet(game, timestamp, client);
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
+}
+
+try {
+  // Some operation
+} catch (error) {
+  console.error('Error occurred:', error.message);
 }
 
 module.exports = { postNBATweets };
