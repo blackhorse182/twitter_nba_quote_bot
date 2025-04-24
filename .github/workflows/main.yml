@@ -2,107 +2,30 @@ name: NBA Tweet Bot
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # Runs daily at 12:00 UTC
+    - cron: '0 6 * * *'  # Runs daily at 6:00 UTC
   workflow_dispatch:      # Allows manual triggering
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'  # Node.js 20
-          cache: 'npm'        # Cache npm dependencies
+          node-version: '18' # Use the Node.js version compatible with your project
 
       - name: Install dependencies
-        run: |
-          echo "Attempting npm ci..."
-          npm ci || {
-            echo "npm ci failed, falling back to npm install..."
-            rm -f package-lock.json
-            npm install
-            echo "npm install completed, regenerating package-lock.json"
-          }
-        continue-on-error: false  # Fail if dependencies can't be installed
+        run: npm install
 
-      - name: Debug environment
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "Node version:"
-          node --version
-          echo "NPM version:"
-          npm --version
-          echo "Commit hash:"
-          git rev-parse HEAD
-          echo "Repository files:"
-          ls -la
-          echo "Script existence check:"
-          [ -f nba-bot.js ] && echo "nba-bot.js exists" || echo "nba-bot.js missing"
-          echo "Script content (nba-bot.js):"
-          cat nba-bot.js 2>/dev/null || echo "Failed to read nba-bot.js"
-          echo "Case-sensitive file check:"
-          find . -type f -iname 'nba-bot.js'
-          echo "Environment variables (masked):"
-          echo "TWITTER_APP_KEY: ${TWITTER_APP_KEY:0:4}..."
-          echo "TWITTER_APP_SECRET: ${TWITTER_APP_SECRET:0:4}..."
-          echo "TWITTER_ACCESS_TOKEN: ${TWITTER_ACCESS_TOKEN:0:4}..."
-          echo "TWITTER_ACCESS_SECRET: ${TWITTER_ACCESS_SECRET:0:4}..."
-          echo "RAPIDAPI_KEY: ${RAPIDAPI_KEY:0:4}..."
-          echo "Node modules:"
-          ls -l node_modules | head -n 20
-          echo "Test Node.js execution:"
-          node -e "console.log('Node.js is working')" || exit 1
-          echo "Test minimal script execution:"
-          echo "console.log('Test script running');" > test.js
-          node test.js || exit 1
-
-      - name: Verify secrets
-        run: |
-          echo "Checking secrets..."
-          [ -z "$TWITTER_APP_KEY" ] && echo "Error: TWITTER_APP_KEY is not set" && exit 1
-          [ -z "$TWITTER_APP_SECRET" ] && echo "Error: TWITTER_APP_SECRET is not set" && exit 1
-          [ -z "$TWITTER_ACCESS_TOKEN" ] && echo "Error: TWITTER_ACCESS_TOKEN is not set" && exit 1
-          [ -z "$TWITTER_ACCESS_SECRET" ] && echo "Error: TWITTER_ACCESS_SECRET is not set" && exit 1
-          [ -z "$RAPIDAPI_KEY" ] && echo "Error: RAPIDAPI_KEY is not set" && exit 1
-          echo "All secrets are set"
+      - name: Run the bot
         env:
           TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
           TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-
-      - name: Run NBA Tweet Bot
-        env:
-          TWITTER_APP_KEY: ${{ secrets.TWITTER_APP_KEY }}
-          TWITTER_APP_SECRET: ${{ secrets.TWITTER_APP_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        run: |
-          echo "Checking for nba-bot.js..."
-          if [ -f nba-bot.js ]; then
-            echo "nba-bot.js found, running script..."
-            node nba-bot.js || { echo "Script failed with exit code $?"; exit 1; }
-          else
-            echo "Error: nba-bot.js not found"
-            exit 1
-          fi
-
-      - name: Notify on failure
-        if: failure()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -X POST -H 'Content-type: application/json' \
-              --data "{\"text\": \"NBA Bot failed in ${{ github.repository }}. Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
-              "$SLACK_WEBHOOK_URL" || echo "Failed to send Slack notification"
-          else
-            echo "SLACK_WEBHOOK_URL not set, skipping notification"
-          fi
+        run: npm start
