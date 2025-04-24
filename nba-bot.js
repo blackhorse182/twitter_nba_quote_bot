@@ -33,6 +33,7 @@ async function getNBAResults() {
     const dateStr = yesterday.toISOString().split('T')[0];
     console.log(`Fetching games for date: ${dateStr}`);
     console.log(`RapidAPI key status: ${process.env.RAPIDAPI_KEY ? 'Set' : 'Missing'}`);
+    console.log('Fetching NBA results...');
     const response = await axios.get('https://api-nba-v1.p.rapidapi.com/games', {
       headers: {
         'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
@@ -136,7 +137,6 @@ async function postMatchTweet(game, timestamp, client) {
     const mediaIds = fs.existsSync(logoPath) ? [await uploadMedia(logoPath, client)] : [];
     const tweetPayload = { text: tweetContent, media: { media_ids: mediaIds } };
     console.log('Tweet payload:', JSON.stringify(tweetPayload));
-    console.log('Tweet payload:', tweetPayload);
     await client.v2.tweet(tweetPayload);
     console.log('Tweet posted successfully.');
     console.log(`Match tweet posted: ${tweetContent}`);
@@ -144,8 +144,6 @@ async function postMatchTweet(game, timestamp, client) {
     console.error(`Error posting match tweet for game ${game.gameId}:`, error.message, 'Data:', error.response?.data);
   }
 }
-
-
 
 async function postNBATweets() {
   console.log('Starting NBA Tweet Bot...');
@@ -155,37 +153,31 @@ async function postNBATweets() {
     accessToken: process.env.TWITTER_ACCESS_TOKEN,
     accessSecret: process.env.TWITTER_ACCESS_SECRET,
   });
-
-  let results = [];
-
+  console.log('NBA Tweet Bot is starting...');
   try {
     console.log('Fetching NBA results...');
-    results = await getNBAResultsWithRetry();
-  } catch (error) {
-    console.error("Fatal error in postNBATweets:", error.message);
-    return;
-  }
+    const results = await getNBAResultsWithRetry();
+    console.log('Results fetched:', results);
 
-  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  if (results.length === 0) {
-    console.log('No NBA games found. Exiting...');
-    return;
-  }
-  if (results.length === 0) {
-    console.log('No game results available, skipping match tweets.');
-  } else {
-    for (const game of results) {
-      console.log('Posting tweet...');
-      await postMatchTweet(game, timestamp, client);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+    if (results.length === 0) {
+      console.log('No NBA games found. Exiting...');
+      return;
     }
+
+    for (const game of results) {
+      console.log('Posting tweet for game:', game);
+      await postMatchTweet(game, new Date().toISOString(), client);
+    }
+    console.log('NBA Tweet Bot finished execution.');
+  } catch (error) {
+    console.error('Fatal error in NBA Tweet Bot:', error.message, error.stack);
   }
 }
 
 try {
   // Some operation
 } catch (error) {
-  console.error('Error occurred:', error.message);
+  console.error('Error occurred:', error.message, error.stack);
 }
 
 module.exports = { postNBATweets };
