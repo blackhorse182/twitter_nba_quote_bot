@@ -2,7 +2,8 @@
   "name": "twitter_nba_quote_bot",
   "version": "1.0.0",
   "scripts": {
-    "start": "node nba-bot.js"
+    "start": "node nba-bot.js",
+    "debug": "node --inspect-brk nba-bot.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
